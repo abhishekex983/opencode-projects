@@ -1,0 +1,47 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  color: #6b7280;
+}
+
+.gantt-wrapper {
+  position: relative;
+  height: 100vh;
+  width: 100%;
+}
+
+.gantt-wrapper iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
+.net-badge {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(99, 102, 241, 0.9);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  z-index: 10000;
+  pointer-events: none;
+  letter-spacing: 0.05em;
+}

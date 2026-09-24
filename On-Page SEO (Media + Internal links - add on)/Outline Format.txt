@@ -1,0 +1,56 @@
+Outline format:
+
+H1: {focus keyword}: {USP}
+
+[Intro paragraph -- above-the-fold summary]
+Describe what the writer should put here (no heading). Aim: a 2-3 sentence above-the-fold summary that names the {focus keyword} in the first sentence, states who the page serves and what they'll get, mentions 1-2 must-cover entities or value propositions to anchor topical relevance, and reads benefit-led (not promotional).
+
+H2: Why Us [Include Header keywords and Entities]
+Create content based on Entities, common keywords, and extra keywords.
+
+H3: [Value proposition1 with Header keywords]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: [Value proposition 2 with Header keywords]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: [Value proposition 3 with Header keywords]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H2: Our Services [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: [Service 1 with Header keywords]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: [Service 2 with Header keywords]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: [Service 3 with Header keywords]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H2: What our clients say about us [Include Header keywords and Entities]
+Create content based on Entities, common keywords, and extra keywords.
+
+H2: Contact Us [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H2: FAQ [Include Relevant Header keywords and Entities]
+
+H3: FAQ [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: FAQ [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: FAQ [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: FAQ [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: FAQ [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.
+
+H3: FAQ [Include Relevant Header keywords and Entities]
+Create content based on the Entities, common keywords, and extra keywords.

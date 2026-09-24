@@ -1,0 +1,129 @@
+{
+  "total_monthly_volume": 82160,
+  "unique_audience": 53404,
+  "tam": 74765,
+  "demographic_segments": [
+    {
+      "age_group": "25-34",
+      "gender": "male",
+      "audience_size": 6218
+    },
+    {
+      "age_group": "25-34",
+      "gender": "female",
+      "audience_size": 8948
+    },
+    {
+      "age_group": "35-44",
+      "gender": "male",
+      "audience_size": 12852
+    },
+    {
+      "age_group": "35-44",
+      "gender": "female",
+      "audience_size": 18495
+    },
+    {
+      "age_group": "45-54",
+      "gender": "male",
+      "audience_size": 2824
+    },
+    {
+      "age_group": "45-54",
+      "gender": "female",
+      "audience_size": 4064
+    }
+  ],
+  "geo_segments": [
+    {
+      "region": "Western Australia",
+      "audience_size": 14089,
+      "interest": 458
+    },
+    {
+      "region": "Tasmania",
+      "audience_size": 8951,
+      "interest": 291
+    },
+    {
+      "region": "Queensland",
+      "audience_size": 8398,
+      "interest": 273
+    },
+    {
+      "region": "Victoria",
+      "audience_size": 7629,
+      "interest": 248
+    },
+    {
+      "region": "South Australia",
+      "audience_size": 6337,
+      "interest": 206
+    },
+    {
+      "region": "New South Wales",
+      "audience_size": 6214,
+      "interest": 202
+    },
+    {
+      "region": "Australian Capital Territory",
+      "audience_size": 1784,
+      "interest": 58
+    }
+  ],
+  "intent_segments": {
+    "commercial": {
+      "volume": 82140,
+      "pct": 100.0
+    },
+    "informational": {
+      "volume": 20,
+      "pct": 0.0
+    },
+    "transactional": {
+      "volume": 0,
+      "pct": 0.0
+    }
+  },
+  "commercial_market": {
+    "audience_size": 53404,
+    "avg_cpc": 1.21
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 5,
+    "declining": 0
+  },
+  "competition_level": "HIGH",
+  "avg_cpc": 1.21,
+  "report_id": "0bdbe04744ab",
+  "description": "Australian travelers looking for flight deals and holiday packages to Bali",
+  "location_name": "Australia",
+  "language_code": "en",
+  "depth": "full",
+  "seed_keywords": [
+    "flights to bali from australia",
+    "bali holiday packages australia",
+    "cheap flights bali",
+    "bali all inclusive resorts",
+    "best time to visit bali",
+    "bali travel deals australia",
+    "bali flight and hotel packages",
+    "flights to denpasar from sydney",
+    "bali family holidays australia",
+    "bali honeymoon packages australia",
+    "bali villa rentals",
+    "bali travel restrictions",
+    "flights to bali qantas",
+    "bali holiday packages from melbourne",
+    "best area to stay in bali",
+    "bali flights sale",
+    "bali cheap all inclusive holidays",
+    "direct flights to bali australia",
+    "bali surfing packages australia",
+    "bali travel guide",
+    "cheap flights to bali",
+    "bali holiday packages"
+  ],
+  "seed_count": 22
+}

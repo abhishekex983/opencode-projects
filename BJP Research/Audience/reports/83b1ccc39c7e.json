@@ -1,0 +1,69 @@
+{
+  "total_monthly_volume": 160280,
+  "unique_audience": 104182,
+  "tam": 145854,
+  "demographic_segments": [],
+  "geo_segments": [],
+  "intent_segments": {
+    "commercial": {
+      "volume": 130590,
+      "pct": 81.5
+    },
+    "informational": {
+      "volume": 18700,
+      "pct": 11.7
+    },
+    "transactional": {
+      "volume": 10510,
+      "pct": 6.6
+    },
+    "navigational": {
+      "volume": 480,
+      "pct": 0.3
+    }
+  },
+  "commercial_market": {
+    "audience_size": 84908,
+    "avg_cpc": 1.3
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 0,
+    "declining": 5
+  },
+  "competition_level": "LOW",
+  "avg_cpc": 1.3,
+  "report_id": "83b1ccc39c7e",
+  "description": "Canadian parents looking for baby products and childcare services",
+  "location_name": "Canada",
+  "language_code": "en",
+  "depth": "balanced",
+  "seed_keywords": [
+    "baby stores near me",
+    "best daycare toronto",
+    "baby formula canada",
+    "cheap diapers online",
+    "organic baby food brands",
+    "infant car seats canada",
+    "potty training tips",
+    "pediatricians near me",
+    "best baby monitor reviews",
+    "child care subsidies ontario",
+    "baby clothes online canada",
+    "newborn sleep schedule",
+    "stroller reviews canada",
+    "daycare waitlists calgary",
+    "baby proofing supplies",
+    "vaccination schedule canada",
+    "postpartum support groups",
+    "find a nanny vancouver",
+    "baby registry checklist",
+    "breastfeeding support groups near me",
+    "baby products canada",
+    "childcare services",
+    "daycare near me",
+    "baby formula",
+    "strollers"
+  ],
+  "seed_count": 25
+}

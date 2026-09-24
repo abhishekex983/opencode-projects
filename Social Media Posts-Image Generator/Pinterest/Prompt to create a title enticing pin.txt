@@ -1,0 +1,139 @@
+﻿Format: Portrait (2:3 ratio), Pinterest-optimized
+
+Objective:
+Create a high-converting Pinterest pin designed to increase clicks to the referenced blog post. The design should feel like a premium editorial magazine cover combined with a trusted medical/wellness brand.
+
+Content Source:
+Use information, key insights, and images from the referenced blog post.
+
+Brand Identity:
+Use colors and typography from the provided brand kit:
+{F:\Opencode Projects\Social Media Posts-Image Generator\Pinterest\Thin Hair Growth Guide Brand Colors.txt}
+
+Audience: Male
+- Tone: Direct, bold, no fluff
+- Visual: Sharp geometry, strong contrast
+- Colors: Cool/neutral tones
+- Messaging: Empowering, solution-focused
+
+Visual Style & Aesthetic:
+
+Premium editorial healthcare magazine style.
+
+Inspiration:
+- Men's Health magazine
+- Forbes Health
+- Luxury skincare brands
+- Modern medical publications
+
+Design Requirements:
+
+- Large curiosity-driven headline at the top
+- Use the provided blog image as the main hero visual
+- Strong visual hierarchy:
+    1. Attention-grabbing headline
+    2. Hero image
+    3. Supporting credibility statement
+
+- Clean premium layout
+- Plenty of whitespace
+- Modern typography
+- Professional medical trust aesthetic
+- Sophisticated and authoritative
+- Designed for Pinterest scrolling behavior
+
+Typography:
+
+- Bold headline typography
+- Maximum readability on mobile screens
+- Use short, powerful phrases
+- No small unreadable text
+- All text must be perfectly spelled and grammatically correct
+
+Color Direction:
+
+- Follow brand kit colors
+- Use subtle medical/wellness tones
+- Avoid overly bright marketing colors
+- Maintain premium brand consistency
+
+Visual Elements:
+
+Include:
+- Provided blog image/photo
+- Subtle decorative elements
+- Minimal geometric shapes or lines
+
+Avoid:
+- Generic stock infographic layouts
+- Excessive icons
+- Cartoon illustrations
+- Cluttered information blocks
+- Fake statistics
+- AI-generated text inside images
+
+Text Rules:
+
+The generated image must contain only:
+- Main headline
+- Short supporting subtitle
+
+Do NOT add paragraphs or unnecessary text.
+
+## Logo Requirement (STRICT)
+
+Use ONLY the official Thin Hair Growth Guide logo. Do NOT generate or invent a logo.
+
+Logo files:
+- Light backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide logo.png
+- Dark backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide ( White logo).png
+
+Placement: Bottom-right corner, approximately 8-10% of image width.
+Maintain clear padding from edges.
+
+## Kie.ai API Configuration
+
+Endpoint: POST https://api.kie.ai/api/v1/jobs/createTask
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+
+Model: gpt-image-2-image-to-image
+
+Request Format (parameters go inside 'input' object):
+{
+  "model": "gpt-image-2-image-to-image",
+  "callBackUrl": "https://webhook.site/...",
+  "input": {
+    "prompt": "<your prompt here>",
+    "input_urls": ["<hero image URL>"],
+    "aspect_ratio": "2:3",
+    "resolution": "2K"
+  }
+}
+
+Polling (check task status):
+GET https://api.kie.ai/api/v1/jobs/recordInfo?taskId={taskId}
+
+Response format:
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "state": "success",
+    "resultJson": "{\"resultUrls\":[\"https://...\"]}"
+  }
+}
+
+References:
+
+Blog article:
+{Add blog URL}
+
+Brand kit:
+{Add brand kit URL}
+
+Blog images:
+Use only as visual reference and incorporate the provided hero image.
+
+Final Output:
+A premium Pinterest pin that looks like a professionally designed editorial cover, optimized for clicks, trust, and brand recognition.

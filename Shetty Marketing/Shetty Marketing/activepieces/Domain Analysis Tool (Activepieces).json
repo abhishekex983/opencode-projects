@@ -1,0 +1,103 @@
+{
+  "name": "Domain Analysis Tool (with Traffic History)",
+  "type": "CUSTOM",
+  "summary": "",
+  "description": "Off-page SEO domain analysis: per-domain backlinks, organic traffic, 12-month traffic history, and an AI backlink-opportunity verdict. Ported from the n8n 'Domain Analysis Tool (with Traffic History)' workflow.",
+  "tags": [],
+  "blogUrl": null,
+  "metadata": null,
+  "author": "Shetty Marketing",
+  "categories": [
+    "MARKETING"
+  ],
+  "pieces": [
+    "@activepieces/piece-webhook"
+  ],
+  "flows": [
+    {
+      "displayName": "Domain Analysis Tool (with Traffic History)",
+      "valid": true,
+      "schemaVersion": "20",
+      "trigger": {
+        "name": "trigger",
+        "valid": true,
+        "displayName": "Catch Webhook",
+        "type": "PIECE_TRIGGER",
+        "settings": {
+          "pieceName": "@activepieces/piece-webhook",
+          "pieceVersion": "~0.1.34",
+          "triggerName": "catch_webhook",
+          "input": {
+            "authType": "none",
+            "authFields": {}
+          },
+          "propertySettings": {},
+          "inputUiInfo": {}
+        },
+        "lastUpdatedDate": "2026-05-29T00:00:00.000Z",
+        "nextAction": {
+          "name": "step_1",
+          "valid": true,
+          "displayName": "Analyse Domains",
+          "type": "CODE",
+          "settings": {
+            "sourceCode": {
+              "code": "export const code = async (inputs) => {\n  // ── Utilities ────────────────────────────────────────────────────────────────\n  function normalizeDomain(raw) {\n    if (!raw) return '';\n    var s = raw.trim().toLowerCase();\n    s = s.replace(/^https?:\\/\\//, '').replace(/^www\\./, '');\n    return s.split('/')[0].split('?')[0].split('#')[0];\n  }\n  function fmtNum(n) {\n    if (!n || n === 0) return '0';\n    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';\n    if (n >= 1000)    return (n / 1000).toFixed(1) + 'K';\n    return String(Math.round(n));\n  }\n\n  // ── Lightweight page meta fetch (title + description only) ───────────────────\n  async function fetchMeta(url) {\n    try {\n      var res  = await fetch(url, {\n        method: 'GET',\n        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SEOBot/1.0)' }\n      });\n      var html = await res.text();\n      var tm   = html.match(/<title[^>]*>([^<]{1,200})<\\/title>/i);\n      var title = tm ? tm[1].trim() : '';\n      var mm   = html.match(/name=[\"']description[\"'][^>]*content=[\"']([^\"']{1,400})[\"']/i)\n             || html.match(/content=[\"']([^\"']{1,400})[\"'][^>]*name=[\"']description[\"']/i)\n             || html.match(/property=[\"']og:description[\"'][^>]*content=[\"']([^\"']{1,400})[\"']/i)\n             || html.match(/content=[\"']([^\"']{1,400})[\"'][^>]*property=[\"']og:description[\"']/i);\n      var desc = mm ? mm[1].trim() : '';\n      return { title: title, description: desc, ok: !!(title || desc) };\n    } catch (e) { return { title: '', description: '', ok: false }; }\n  }\n\n  // ── OpenRouter AI call ────────────────────────────────────────────────────────\n  var OR_KEY   = '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';\n  var OR_MODEL = 'openai/gpt-4.1-mini';\n\n  async function aiAssess(myDomain, myMeta, adjDomain, adjMeta, metrics) {\n    var myDesc  = [myMeta.title,  myMeta.description ].filter(Boolean).join(' — ') || myDomain;\n    var adjDesc = [adjMeta.title, adjMeta.description].filter(Boolean).join(' — ') || adjDomain;\n    var prompt =\n      'You are an SEO analyst evaluating backlink opportunities.\\n\\n' +\n      'MY WEBSITE\\n' +\n      'Domain: ' + myDomain + '\\n' +\n      'About: ' + myDesc + '\\n\\n' +\n      'SITE TO EVALUATE\\n' +\n      'Domain: ' + adjDomain + '\\n' +\n      'About: ' + adjDesc + '\\n\\n' +\n      'DATAFORSEO METRICS\\n' +\n      '- Domain Rank: ' + metrics.rank + '/100\\n' +\n      '- Referring Domains: ' + fmtNum(metrics.referringDomains) + '\\n' +\n      '- Backlinks: ' + fmtNum(metrics.backlinks) + '\\n' +\n      '- Spam Score: ' + metrics.spamScore + '/100\\n' +\n      '- Est. Organic Traffic: ' + fmtNum(metrics.totalTraffic) + ' visits/mo\\n\\n' +\n      'Respond ONLY with valid JSON (no markdown, no extra text):\\n' +\n      '{\\n' +\n      '  \"site_summary\": \"One sentence: what is this site about?\",\\n' +\n      '  \"relevancy\": \"High\" or \"Medium\" or \"Low\",\\n' +\n      '  \"verdict\": \"Good\" or \"Conditional\" or \"Bad\",\\n' +\n      '  \"reason\": \"2-3 sentences explaining the domain quality and whether it is a good backlink opportunity for my site. Mention the site niche, traffic quality, and domain authority.\"\\n' +\n      '}';\n    try {\n      var res = await fetch('https://openrouter.ai/api/v1/chat/completions', {\n        method: 'POST',\n        headers: {\n          'Authorization': 'Bearer ' + OR_KEY,\n          'Content-Type': 'application/json',\n          'HTTP-Referer': 'https://' + myDomain,\n          'X-Title': 'Domain Analyser'\n        },\n        body: JSON.stringify({\n          model: OR_MODEL,\n          messages: [{ role: 'user', content: prompt }],\n          max_tokens: 250,\n          temperature: 0.3\n        })\n      });\n      var data    = await res.json();\n      var content = data && data.choices && data.choices[0] &&\n                    data.choices[0].message && data.choices[0].message.content;\n      if (!content) return null;\n      // Strip markdown code fences if present\n      content = content.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```\\s*$/, '').trim();\n      return JSON.parse(content);\n    } catch (e) { return null; }\n  }\n\n  // ── DataforSEO ───────────────────────────────────────────────────────────────\n  var API_BASE = 'https://api.dataforseo.com/v3';\n  var AUTH_HDR = 'Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA==';\n\n  async function dfsPost(endpoint, body) {\n    try {\n      var res = await fetch(API_BASE + endpoint, {\n        method:  'POST',\n        headers: { 'Authorization': AUTH_HDR, 'Content-Type': 'application/json' },\n        body:    JSON.stringify(body)\n      });\n      return await res.json();\n    } catch (e) {\n      return { _error: e.message, tasks: [] };\n    }\n  }\n\n  // ── Normalise historical-traffic response into [{month:'YYYY-MM', etv:n}] ────\n  function extractHistory(rawResp) {\n    var out = [];\n    try {\n      var task  = rawResp && rawResp.tasks && rawResp.tasks[0];\n      var r0    = task && task.result && task.result[0];\n      var items = (r0 && r0.items) || [];\n      if (items.length > 0 && items[0].year !== undefined) {\n        // Shape A — one item per month\n        out = items.map(function (m) {\n          var mm  = String(m.month).padStart(2, '0');\n          var etv = m && m.metrics && m.metrics.organic && m.metrics.organic.etv;\n          return { month: m.year + '-' + mm, etv: Number(etv) || 0 };\n        });\n      } else if (items.length > 0 && items[0].metrics && items[0].metrics.organic) {\n        // Shape B — single item with etv_history map\n        var eh = items[0].metrics.organic.etv_history;\n        if (eh && typeof eh === 'object') {\n          out = Object.keys(eh).map(function (k) {\n            return { month: k, etv: Number(eh[k]) || 0 };\n          });\n        }\n      }\n    } catch (e) {}\n    return out\n      .filter(function (p) { return /^\\d{4}-\\d{2}$/.test(p.month); })\n      .sort(function (a, b) { return a.month.localeCompare(b.month); })\n      .slice(-12);\n  }\n\n  // ── Fallback verdict (when AI is unavailable) ────────────────────────────────\n  function fallbackVerdict(r) {\n    var rank = r.rank || 0, rd = r.referringDomains || 0, ss = r.spamScore || 0;\n    var tot = Object.values(r.traffic).reduce(function (a, b) { return a + b; }, 0);\n    if (ss > 50) return { verdict: 'Bad', relevancy: 'Low',\n      reason: 'High spam score (' + ss + '/100) disqualifies this domain.' };\n    var tS  = tot >= 100000 ? 3 : tot >= 20000 ? 2.5 : tot >= 5000 ? 2 : tot >= 500 ? 1.5 : 1;\n    var rkS = rank >= 60 ? 3 : rank >= 40 ? 2.5 : rank >= 20 ? 2 : rank >= 10 ? 1.5 : 1;\n    var rfS = rd >= 1000 ? 3 : rd >= 200 ? 2.5 : rd >= 50 ? 2 : rd >= 10 ? 1.5 : 1;\n    var spS = ss <= 5 ? 3 : ss <= 15 ? 2.5 : ss <= 30 ? 2 : ss <= 45 ? 1.5 : 1;\n    var w   = tS * 0.35 + rkS * 0.30 + rfS * 0.20 + spS * 0.15;\n    var v   = w >= 2.2 ? 'Good' : w >= 1.65 ? 'Conditional' : 'Bad';\n    return { verdict: v, relevancy: 'Unknown',\n      reason: 'Domain rank: ' + rank + '/100, ' + fmtNum(rd) + ' referring domains, ' + fmtNum(tot) + ' est. visits/mo, spam score: ' + ss + '/100.' };\n  }\n\n  // ── Top-level try/catch ensures the Return Response node always gets valid JSON ─\n  try {\n\n    // This step uses fetch(), available only when Activepieces runs Code in a Node\n    // runtime: AP_EXECUTION_MODE = UNSANDBOXED (self-hosted default) or SANDBOX_PROCESS.\n    // Activepieces Cloud uses SANDBOX_CODE_ONLY (a V8 isolate with no fetch / no require).\n    if (typeof fetch !== 'function') {\n      return { success: false,\n        error: 'fetch is unavailable in this execution mode. Run a self-hosted Activepieces with AP_EXECUTION_MODE=UNSANDBOXED (default) or SANDBOX_PROCESS. Activepieces Cloud (SANDBOX_CODE_ONLY) cannot make HTTP calls from a Code step.' };\n    }\n\n    // Activepieces passes the webhook POST body in as inputs.body (mapped from {{trigger.body}}).\n    var input     = (inputs && inputs.body && typeof inputs.body === 'object') ? inputs.body : (inputs || {});\n    var myDomain  = normalizeDomain(input.myDomain || '');\n    var domains   = (input.domains || []).map(normalizeDomain).filter(Boolean);\n    var countries = input.countries || [{ code: 2840, lang: 'en', name: 'United States' }];\n\n    if (!myDomain || domains.length === 0) {\n      return { success: false,\n        error: 'myDomain and at least one domain are required.',\n        debug_received: input };\n    }\n\n    var primaryCountry = countries[0];\n\n    // Step 1: get my site's meta description for AI context\n    var myMeta = await fetchMeta('https://' + myDomain);\n\n    // Step 2: DataforSEO competitor map (works for established sites)\n    var competitorMap = {};\n    var compData  = await dfsPost(\n      '/dataforseo_labs/google/competitors_domain/live',\n      [{ target: myDomain, location_code: primaryCountry.code,\n         language_code: primaryCountry.lang || 'en', limit: 200 }]\n    );\n    var compTask  = compData.tasks && compData.tasks[0];\n    var compItems = (compTask && compTask.result && compTask.result[0] && compTask.result[0].items) || [];\n    compItems.forEach(function (ci) {\n      competitorMap[normalizeDomain(ci.domain)] = ci.intersections || 0;\n    });\n    var hasComp = compItems.length > 0;\n\n    // Step 3: analyse each adjacent domain\n    var results = [];\n    for (var di = 0; di < domains.length; di++) {\n      var domain = domains[di];\n      var item = {\n        domain: domain, rank: 0, referringDomains: 0,\n        backlinks: 0, spamScore: 0, traffic: {}, trafficHistory: {},\n        relLabel: 'Unknown', siteSummary: '',\n        errors: [], hasBacklinkData: false\n      };\n\n      // 3a: fetch adjacent site meta\n      var adjMeta = await fetchMeta('https://' + domain);\n\n      // 3b: backlinks summary\n      var blRaw  = await dfsPost('/backlinks/summary/live',\n        [{ target: domain, include_subdomains: true }]);\n      var blTask = blRaw.tasks && blRaw.tasks[0];\n      if (blTask && blTask.status_code === 20000 && blTask.result && blTask.result[0]) {\n        var bl = blTask.result[0];\n        item.rank             = bl.rank             !== undefined ? Math.round(bl.rank / 10) : 0;\n        item.referringDomains = bl.referring_domains !== undefined ? bl.referring_domains    : 0;\n        item.backlinks        = bl.backlinks         !== undefined ? bl.backlinks             : 0;\n        item.spamScore        = (bl.info && bl.info.target_spam_score !== undefined)\n                                 ? bl.info.target_spam_score : 0;\n        item.hasBacklinkData  = true;\n      } else {\n        var blErr = blRaw._error || (blTask && blTask.status_message) || 'backlinks unavailable';\n        item.errors.push({ api: 'backlinks', message: blErr });\n      }\n\n      // 3c: organic traffic — one request per country for reliable ordering\n      for (var ci = 0; ci < countries.length; ci++) {\n        var ctry = countries[ci];\n        var tRaw = await dfsPost(\n          '/dataforseo_labs/google/domain_rank_overview/live',\n          [{ target: domain, location_code: ctry.code, language_code: ctry.lang || 'en' }]\n        );\n        var tTask = tRaw.tasks && tRaw.tasks[0];\n        var r0    = tTask && tTask.result && tTask.result[0];\n        var it0   = r0 && r0.items && r0.items[0];\n        var org   = it0 && it0.metrics && it0.metrics.organic;\n        item.traffic[String(ctry.code)] = org ? (org.etv || 0) : 0;\n\n        // 3c-2: 12-month historical traffic for the same country\n        var hRaw = await dfsPost(\n          '/dataforseo_labs/google/historical_rank_overview/live',\n          [{ target: domain, location_code: ctry.code, language_code: ctry.lang || 'en' }]\n        );\n        var history = extractHistory(hRaw);\n        if (history.length === 0) {\n          // Fallback: try the bulk endpoint, which uses a different response shape\n          var hRaw2 = await dfsPost(\n            '/dataforseo_labs/google/historical_bulk_traffic_estimation/live',\n            [{ targets: [domain], location_code: ctry.code, language_code: ctry.lang || 'en' }]\n          );\n          history = extractHistory(hRaw2);\n        }\n        if (history.length === 0 && (hRaw._error || hRaw.tasks && hRaw.tasks[0] && hRaw.tasks[0].status_code !== 20000)) {\n          var hErr = hRaw._error || (hRaw.tasks[0] && hRaw.tasks[0].status_message) || 'history unavailable';\n          item.errors.push({ api: 'historical_rank_overview', country: ctry.code, message: hErr });\n        }\n        item.trafficHistory[String(ctry.code)] = history;\n      }\n\n      // 3d: AI assessment via OpenRouter\n      var totalTraffic = Object.values(item.traffic).reduce(function (a, b) { return a + b; }, 0);\n      var aiResult = await aiAssess(myDomain, myMeta, domain, adjMeta, {\n        rank: item.rank, referringDomains: item.referringDomains,\n        backlinks: item.backlinks, spamScore: item.spamScore,\n        totalTraffic: totalTraffic\n      });\n\n      if (aiResult && aiResult.verdict && aiResult.relevancy && aiResult.reason) {\n        item.siteSummary = aiResult.site_summary || '';\n        item.verdict = {\n          verdict:  aiResult.verdict,\n          relLabel: aiResult.relevancy,\n          reason:   (aiResult.site_summary ? aiResult.site_summary + ' ' : '') + aiResult.reason\n        };\n      } else {\n        // Fallback if AI call fails\n        var fb = fallbackVerdict(item);\n        item.verdict = { verdict: fb.verdict, relLabel: fb.relevancy, reason: fb.reason };\n      }\n\n      results.push(item);\n    }\n\n    return { success: true, results: results };\n\n  } catch (topErr) {\n    return { success: false, error: String(topErr),\n      stack: topErr && topErr.stack ? topErr.stack.slice(0, 800) : '' };\n  }\n};\n",
+              "packageJson": "{\n  \"dependencies\": {}\n}"
+            },
+            "input": {
+              "body": "{{trigger.body}}"
+            },
+            "propertySettings": {},
+            "inputUiInfo": {},
+            "errorHandlingOptions": {
+              "continueOnFailure": {
+                "value": false
+              },
+              "retryOnFailure": {
+                "value": false
+              }
+            }
+          },
+          "lastUpdatedDate": "2026-05-29T00:00:00.000Z",
+          "nextAction": {
+            "name": "step_2",
+            "valid": true,
+            "displayName": "Return Response",
+            "type": "PIECE",
+            "settings": {
+              "pieceName": "@activepieces/piece-webhook",
+              "pieceVersion": "~0.1.34",
+              "actionName": "return_response",
+              "input": {
+                "responseType": "json",
+                "fields": {
+                  "status": 200,
+                  "headers": {
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                  },
+                  "body": "{{step_1}}"
+                },
+                "respond": "stop"
+              },
+              "propertySettings": {},
+              "inputUiInfo": {},
+              "errorHandlingOptions": {
+                "continueOnFailure": {
+                  "value": false
+                },
+                "retryOnFailure": {
+                  "value": false
+                }
+              }
+            },
+            "lastUpdatedDate": "2026-05-29T00:00:00.000Z"
+          }
+        }
+      }
+    }
+  ],
+  "status": "PUBLISHED"
+}

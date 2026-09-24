@@ -1,0 +1,433 @@
+{
+  "name": "Research Questions",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Research Questions\n\n**Goal:** Find the underlying *problems* users have around a keyword, not just literal questions.\n\n**Flow:**\n1. Webhook accepts `{ keyword, location, language, device, industry, sources: ['reddit','quora','forums','youtube'] }`.\n2. Normalize input + validate.\n3. **Five parallel lanes** fire from Normalize (n8n runs sibling branches concurrently):\n   - DataForSEO `/serp/google/organic/live/advanced` → People Also Ask\n   - Exa neural search × Reddit (includeDomains: reddit.com)\n   - Exa neural search × Quora\n   - Exa neural search × Niche Forums (excludeDomains for big ones, category: \"social media\")\n   - Exa neural search × YouTube\n   Each Exa call uses the inline `contents` param so search + content extraction happen in one round-trip.\n4. Per-lane parse normalizes results into `{ source, items: [{ title, url, text, highlights }] }`.\n5. Merge Lanes → Aggregate evidence blocks for the LLM (PAA + per-source blocks with [PAA1], [R1], [Q1], [F1], [Y1] citation IDs).\n6. Gemini 2.5 Flash clusters the raw signal into 4–8 problem clusters with weights, content angles, representative questions/quotes, and citation IDs.\n7. Build citations map + source counts → Respond.\n\n**Before running:**\n- Activate workflow, copy Production URL into `on-page-app.html` → Research Questions webhook field.\n- DataForSEO PAA node: wire HTTP Basic Auth credential.\n- Exa + OpenRouter API keys are pre-filled in the HTTP node headers. Rotate them in the respective consoles when needed.\n\n**Resilience:** Every HTTP node has `onError: continueRegularOutput` + `neverError: true`. Any lane that errors returns 0 items and the LLM gets the rest — partial signal is still useful.\n\n**Cost / latency:** 1 DataForSEO + 4 Exa + 1 Gemini = 6 API hits total. ~30–90s end-to-end (parallel lanes; Exa contents is the long pole).",
+        "height": 700,
+        "width": 420
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000000",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "question-research",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 700],
+      "webhookId": "question-research-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "is-test-cond",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000002",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Question Research webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000003",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [608, 820]
+    },
+    {
+      "parameters": {
+        "jsCode": "const SOURCE_CONFIG = {\n  reddit:  { numResults: 12 },\n  quora:   { numResults: 8 },\n  forums:  { numResults: 10 },\n  youtube: { numResults: 6 }\n};\n\nconst input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\n\nconst keyword = String(body.keyword || '').trim();\nif (!keyword) throw new Error('A keyword is required.');\n\nconst requested = Array.isArray(body.sources) && body.sources.length\n  ? body.sources.map(s => String(s).toLowerCase().trim())\n  : ['reddit', 'quora', 'forums', 'youtube'];\nconst sources = requested.filter(s => SOURCE_CONFIG[s]);\nif (!sources.length) throw new Error('At least one community source must be enabled (reddit / quora / forums / youtube).');\n\nreturn [{\n  json: {\n    keyword,\n    location: String(body.location || 'United States').trim(),\n    language: String(body.language || 'en').trim(),\n    device: String(body.device || 'desktop').trim(),\n    industry: String(body.industry || '').trim(),\n    sources,\n    enabled: {\n      reddit: sources.includes('reddit'),\n      quora: sources.includes('quora'),\n      forums: sources.includes('forums'),\n      youtube: sources.includes('youtube')\n    },\n    num_results: {\n      reddit: SOURCE_CONFIG.reddit.numResults,\n      quora: SOURCE_CONFIG.quora.numResults,\n      forums: SOURCE_CONFIG.forums.numResults,\n      youtube: SOURCE_CONFIG.youtube.numResults\n    },\n    requested_at: body.requested_at || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000004",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [608, 580]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/serp/google/organic/live/advanced",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA==" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify([{ keyword: $json.keyword, location_name: $json.location, language_code: $json.language, device: $json.device, depth: 20 }]) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000010",
+      "name": "DataForSEO PAA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [832, 180],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json || {};\nconst taskResult = resp.tasks && resp.tasks[0] && resp.tasks[0].result && resp.tasks[0].result[0];\nif (!taskResult) return [{ json: { source: 'paa', items: [] } }];\n\nconst items = taskResult.items || [];\nconst paaItem = items.find(i => i.type === 'people_also_ask');\nif (!paaItem || !Array.isArray(paaItem.items)) return [{ json: { source: 'paa', items: [] } }];\n\nconst paa = paaItem.items.slice(0, 10).map(q => {\n  const expanded = Array.isArray(q.expanded_element) && q.expanded_element[0] ? q.expanded_element[0] : null;\n  return {\n    question: q.title || '',\n    answer_snippet: expanded ? (expanded.description || expanded.featured_title || '') : '',\n    source_url: expanded ? (expanded.url || '') : '',\n    source_domain: expanded ? (expanded.domain || '') : ''\n  };\n}).filter(q => q.question);\n\nreturn [{ json: { source: 'paa', items: paa } }];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000011",
+      "name": "Parse PAA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.exa.ai/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-api-key", "value": "b0beb520-610f-4246-ade5-7620631a89aa" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.keyword + ' \\u2014 people asking questions or describing problems', numResults: $json.num_results.reddit, type: 'neural', useAutoprompt: true, includeDomains: ['reddit.com'], contents: { text: { maxCharacters: 4000, includeHtmlTags: false }, highlights: { numSentences: 3, highlightsPerUrl: 3, query: $json.keyword } } }) }}",
+        "options": {
+          "timeout": 45000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000020",
+      "name": "Exa Search Reddit",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [832, 380],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const enabled = $('Normalize Input').first().json.enabled.reddit;\nif (!enabled) return [{ json: { source: 'reddit', items: [] } }];\nconst resp = $input.first().json || {};\nconst raw = Array.isArray(resp.results) ? resp.results : [];\nconst items = raw.map(r => ({\n  id: r.id,\n  url: r.url,\n  title: r.title,\n  score: r.score,\n  publishedDate: r.publishedDate,\n  text: r.text || '',\n  highlights: Array.isArray(r.highlights) ? r.highlights : []\n}));\nreturn [{ json: { source: 'reddit', items } }];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000021",
+      "name": "Parse Reddit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 380]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.exa.ai/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-api-key", "value": "b0beb520-610f-4246-ade5-7620631a89aa" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.keyword + ' questions and answers', numResults: $json.num_results.quora, type: 'neural', useAutoprompt: true, includeDomains: ['quora.com'], contents: { text: { maxCharacters: 4000, includeHtmlTags: false }, highlights: { numSentences: 3, highlightsPerUrl: 3, query: $json.keyword } } }) }}",
+        "options": {
+          "timeout": 45000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000030",
+      "name": "Exa Search Quora",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [832, 560],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const enabled = $('Normalize Input').first().json.enabled.quora;\nif (!enabled) return [{ json: { source: 'quora', items: [] } }];\nconst resp = $input.first().json || {};\nconst raw = Array.isArray(resp.results) ? resp.results : [];\nconst items = raw.map(r => ({\n  id: r.id, url: r.url, title: r.title, score: r.score,\n  publishedDate: r.publishedDate,\n  text: r.text || '',\n  highlights: Array.isArray(r.highlights) ? r.highlights : []\n}));\nreturn [{ json: { source: 'quora', items } }];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000031",
+      "name": "Parse Quora",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.exa.ai/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-api-key", "value": "b0beb520-610f-4246-ade5-7620631a89aa" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.keyword + ' forum discussion troubleshooting community thread', numResults: $json.num_results.forums, type: 'neural', useAutoprompt: true, excludeDomains: ['reddit.com', 'quora.com', 'youtube.com', 'youtu.be'], category: 'social media', contents: { text: { maxCharacters: 4000, includeHtmlTags: false }, highlights: { numSentences: 3, highlightsPerUrl: 3, query: $json.keyword } } }) }}",
+        "options": {
+          "timeout": 45000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000040",
+      "name": "Exa Search Forums",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [832, 740],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const enabled = $('Normalize Input').first().json.enabled.forums;\nif (!enabled) return [{ json: { source: 'forums', items: [] } }];\nconst resp = $input.first().json || {};\nconst raw = Array.isArray(resp.results) ? resp.results : [];\nconst items = raw.map(r => ({\n  id: r.id, url: r.url, title: r.title, score: r.score,\n  publishedDate: r.publishedDate,\n  text: r.text || '',\n  highlights: Array.isArray(r.highlights) ? r.highlights : []\n}));\nreturn [{ json: { source: 'forums', items } }];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000041",
+      "name": "Parse Forums",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 740]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.exa.ai/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "x-api-key", "value": "b0beb520-610f-4246-ade5-7620631a89aa" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query: $json.keyword + ' explained \\u2014 viewer questions in comments', numResults: $json.num_results.youtube, type: 'neural', useAutoprompt: true, includeDomains: ['youtube.com', 'youtu.be'], contents: { text: { maxCharacters: 4000, includeHtmlTags: false }, highlights: { numSentences: 3, highlightsPerUrl: 3, query: $json.keyword } } }) }}",
+        "options": {
+          "timeout": 45000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000050",
+      "name": "Exa Search YouTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [832, 920],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const enabled = $('Normalize Input').first().json.enabled.youtube;\nif (!enabled) return [{ json: { source: 'youtube', items: [] } }];\nconst resp = $input.first().json || {};\nconst raw = Array.isArray(resp.results) ? resp.results : [];\nconst items = raw.map(r => ({\n  id: r.id, url: r.url, title: r.title, score: r.score,\n  publishedDate: r.publishedDate,\n  text: r.text || '',\n  highlights: Array.isArray(r.highlights) ? r.highlights : []\n}));\nreturn [{ json: { source: 'youtube', items } }];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000051",
+      "name": "Parse YouTube",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 920]
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000060",
+      "name": "Merge Lanes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1248, 580]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stitch the 5 lanes back into a single payload the LLM can consume.\nconst inputs = $('Normalize Input').first().json;\nconst lanes = $input.all().map(it => it.json);\nconst bySource = new Map(lanes.map(l => [l.source, l.items || []]));\n\nconst paa = bySource.get('paa') || [];\nconst exaBundles = [\n  { source: 'reddit',  results: bySource.get('reddit')  || [] },\n  { source: 'quora',   results: bySource.get('quora')   || [] },\n  { source: 'forums',  results: bySource.get('forums')  || [] },\n  { source: 'youtube', results: bySource.get('youtube') || [] }\n].filter(b => inputs.enabled[b.source]);\n\nfunction safeHost(url) { try { return new URL(url).host.replace(/^www\\./, ''); } catch { return ''; } }\n\nfunction buildPaaBlock(paa) {\n  if (!paa.length) return '';\n  const rows = paa.map((q, idx) => {\n    const id = 'PAA' + (idx + 1);\n    return [\n      '[' + id + '] ' + q.question,\n      q.answer_snippet ? 'Snippet: ' + String(q.answer_snippet).replace(/\\s+/g, ' ').trim().slice(0, 320) : '',\n      q.source_url ? 'Source: ' + q.source_url : ''\n    ].filter(Boolean).join('\\n');\n  });\n  return '=== GOOGLE PEOPLE ALSO ASK (' + paa.length + ' items) ===\\n' + rows.join('\\n\\n');\n}\n\nfunction buildEvidenceBlock(source, items) {\n  if (!items.length) return '';\n  const rows = items.slice(0, 12).map((it, idx) => {\n    const id = source[0].toUpperCase() + (idx + 1);\n    const title = (it.title || '').replace(/\\s+/g, ' ').trim().slice(0, 200);\n    const highlights = Array.isArray(it.highlights)\n      ? it.highlights.slice(0, 3).map(h => '  \\u00b7 ' + String(h).replace(/\\s+/g, ' ').trim().slice(0, 320)).join('\\n')\n      : '';\n    const textSample = it.text ? String(it.text).replace(/\\s+/g, ' ').trim().slice(0, 600) : '';\n    return [\n      '[' + id + '] ' + title,\n      it.url ? 'URL: ' + it.url : '',\n      highlights ? 'Top passages:\\n' + highlights : '',\n      textSample ? 'Body excerpt: ' + textSample : ''\n    ].filter(Boolean).join('\\n');\n  });\n  return '=== ' + source.toUpperCase() + ' (' + items.length + ' items) ===\\n' + rows.join('\\n\\n');\n}\n\nconst sourceBlocks = exaBundles.map(b => buildEvidenceBlock(b.source, b.results)).filter(Boolean);\nconst totalEvidence = paa.length + exaBundles.reduce((s, b) => s + b.results.length, 0);\n\n// Build citation lookup for the dashboard.\nconst citations = {};\npaa.forEach((q, i) => {\n  citations['PAA' + (i + 1)] = { kind: 'paa', label: q.question, url: q.source_url || '', domain: q.source_domain || '' };\n});\nfor (const { source, results } of exaBundles) {\n  const prefix = source[0].toUpperCase();\n  results.slice(0, 12).forEach((it, i) => {\n    citations[prefix + (i + 1)] = { kind: source, label: it.title || '', url: it.url || '', domain: it.url ? safeHost(it.url) : '' };\n  });\n}\n\nconst source_counts = exaBundles.map(b => ({ source: b.source, count: b.results.length, error: null }));\n\nreturn [{\n  json: {\n    ...inputs,\n    paa,\n    exa_bundles: exaBundles,\n    source_blocks: sourceBlocks,\n    paa_block: buildPaaBlock(paa),\n    total_evidence: totalEvidence,\n    citations,\n    source_counts\n  }\n}];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000061",
+      "name": "Aggregate Evidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1456, 580]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "has-evidence-cond",
+              "leftValue": "={{ $json.total_evidence }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000062",
+      "name": "Has Evidence?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1664, 580]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first().json;\nreturn [{\n  json: {\n    request: { keyword: inp.keyword, location: inp.location, language: inp.language, sources: inp.sources },\n    summary: 'No evidence returned by any source. Try a broader keyword or check API connectivity.',\n    clusters: [],\n    unclustered_questions: [],\n    paa: [],\n    source_counts: inp.source_counts,\n    citations: {},\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000063",
+      "name": "No Evidence Fallback",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1872, 740]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first().json;\n\nconst systemPrompt = [\n  'You are a senior content strategist analysing audience research for an SEO/content brief. Your job: read a pile of raw evidence (Google People Also Ask + Reddit/Quora/forum/YouTube threads) about ONE keyword and group it into the underlying USER PROBLEMS.',\n  '',\n  'CRITICAL RULES:',\n  '1. Group by *underlying problem*, not by literal wording. \"Will it hurt?\", \"Is the procedure painful?\", and \"Anaesthesia options\" all belong to the same Pain/Comfort cluster.',\n  '2. Use only the evidence provided. Never invent quotes, URLs, or claims. If evidence is thin, return fewer clusters with lower confidence \\u2014 do not pad.',\n  '3. Every cluster must cite at least one evidence ID (e.g. [PAA3], [R5], [Q2], [F1], [Y2]). Cite the IDs as they appear in the evidence blocks below.',\n  '4. Produce 4\\u20138 clusters total. Bigger clusters first (more supporting evidence). Drop clusters with <2 supporting items unless the signal is unusually strong.',\n  '5. `representative_questions` are the 3\\u20136 best-phrased questions a content writer could literally use as H2s or FAQ entries \\u2014 pick from the evidence or paraphrase tightly, never invent from thin air.',\n  '6. `representative_quotes` are short verbatim snippets that capture the user emotion or specifics. Keep under ~30 words each. Include the citation ID inline.',\n  '7. `intent_signal` describes what stage the user is in (e.g. \"comparing options before buying\", \"troubleshooting after purchase\", \"researching before deciding\").',\n  '8. `content_angle` is one sentence telling the writer how to address this cluster on-page (e.g. \"Open with a calming explainer plus a 30-sec video of the procedure\").',\n  '',\n  'OUTPUT: valid JSON only. No markdown fences. No prose outside JSON. Schema exactly:',\n  '{',\n  '  \"keyword\": \"string\",',\n  '  \"summary\": \"2\\u20133 sentence overview of what the audience is actually struggling with around this keyword\",',\n  '  \"clusters\": [',\n  '    {',\n  '      \"title\": \"Short noun-phrase (max 8 words)\",',\n  '      \"problem\": \"1\\u20132 sentences describing the underlying user problem\",',\n  '      \"intent_signal\": \"string\",',\n  '      \"content_angle\": \"string\",',\n  '      \"representative_questions\": [\"string\", ...],',\n  '      \"representative_quotes\": [{ \"quote\": \"string\", \"cite\": \"PAA3\" }, ...],',\n  '      \"evidence_ids\": [\"PAA3\", \"R5\", ...],',\n  '      \"weight\": integer 0-100',\n  '    }',\n  '  ],',\n  '  \"unclustered_questions\": [\"any raw question worth keeping that didn\\'t fit a cluster\"],',\n  '  \"notes\": \"one-line note if evidence was thin or skewed, else empty string\"',\n  '}',\n  '',\n  'Cluster `weight` is the % of total evidence supporting this cluster; weights across clusters should roughly sum to 100.'\n].join('\\n');\n\nconst userLines = [\n  'KEYWORD: ' + inp.keyword,\n  'LOCATION: ' + inp.location,\n  'LANGUAGE: ' + inp.language,\n  inp.industry ? 'INDUSTRY CONTEXT: ' + inp.industry : '',\n  '',\n  'EVIDENCE BLOCKS (cite items using the [ID] tags):',\n  '',\n  inp.paa_block || '',\n  ...inp.source_blocks,\n  '',\n  'Return only the JSON object as specified.'\n].filter(l => l !== '');\n\nreturn [{\n  json: {\n    ...inp,\n    llm_request: {\n      model: 'google/gemini-2.5-flash',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userLines.join('\\n') }\n      ],\n      temperature: 0.3,\n      max_tokens: 8192,\n      response_format: { type: 'json_object' }\n    }\n  }\n}];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000064",
+      "name": "Build LLM Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1872, 460]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Bearer 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" },
+            { "name": "HTTP-Referer", "value": "https://shettymarketing.local/on-page-seo" },
+            { "name": "X-Title", "value": "On-Page SEO :: Question Research" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.llm_request) }}",
+        "options": {
+          "timeout": 90000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000065",
+      "name": "OpenRouter Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2080, 460],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const upstream = $('Build LLM Payload').first().json;\nconst response = $input.first().json;\n\nif (response && response.error) {\n  return [{ json: { error: 'OpenRouter error: ' + (response.error.message || response.error.code || JSON.stringify(response.error)), raw: response.error } }];\n}\n\nconst text = response && response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content;\nif (!text) {\n  return [{ json: { error: 'No content in OpenRouter response', raw: response } }];\n}\n\nlet parsed;\ntry { parsed = JSON.parse(text); }\ncatch (e) {\n  const cleaned = text.replace(/^```json\\s*/i, '').replace(/```\\s*$/, '').trim();\n  try { parsed = JSON.parse(cleaned); }\n  catch (e2) { return [{ json: { error: 'Failed to parse JSON from model', raw_text: text } }]; }\n}\n\nif (Array.isArray(parsed.clusters) && parsed.clusters.length) {\n  const total = parsed.clusters.reduce((s, c) => s + (Number(c.weight) || 0), 0);\n  if (total > 0 && Math.abs(total - 100) > 5) {\n    parsed.clusters = parsed.clusters.map(c => ({ ...c, weight: Math.round((Number(c.weight) || 0) * 100 / total) }));\n  }\n  parsed.clusters.sort((a, b) => (Number(b.weight) || 0) - (Number(a.weight) || 0));\n}\nparsed.keyword = parsed.keyword || upstream.keyword;\n\nreturn [{\n  json: {\n    request: {\n      keyword: upstream.keyword,\n      location: upstream.location,\n      language: upstream.language,\n      device: upstream.device,\n      industry: upstream.industry,\n      sources: upstream.sources\n    },\n    summary: parsed.summary || '',\n    clusters: Array.isArray(parsed.clusters) ? parsed.clusters : [],\n    unclustered_questions: Array.isArray(parsed.unclustered_questions) ? parsed.unclustered_questions : [],\n    notes: parsed.notes || '',\n    paa: upstream.paa,\n    source_counts: upstream.source_counts,\n    citations: upstream.citations,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000066",
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2288, 460]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000067",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2496, 580]
+    },
+    {
+      "parameters": {
+        "content": "## Parallel lanes\n\nThe five HTTP nodes (DataForSEO PAA + 4 Exa lanes) all hang off **Normalize Input**, which means n8n runs them in parallel. Wall-clock = the slowest lane, not the sum.\n\n**Each Exa call** uses the inline `contents` parameter so search + content extraction happen in one round-trip. That avoids the two-step search → /contents flow the legacy handler uses.\n\n**Disabled sources:** Lanes whose `sources` aren't in the request *do* fire the HTTP call but the corresponding Parse node returns `{ items: [] }` so they contribute zero evidence to the LLM. To save quota, manually disable any Exa node you don't need.\n\n**Merge Lanes** is configured with 5 inputs (1 per lane). It collects them all into a single execution item per lane, which Aggregate Evidence stitches back into the final payload.",
+        "height": 360,
+        "width": 380,
+        "color": 5
+      },
+      "id": "01a0b0c0-d0e0-4f00-9000-100000000070",
+      "name": "Parallel Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1248, 0]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Is Test?", "type": "main", "index": 0 }]]
+    },
+    "Is Test?": {
+      "main": [
+        [{ "node": "Respond Test OK", "type": "main", "index": 0 }],
+        [{ "node": "Normalize Input", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Input": {
+      "main": [[
+        { "node": "DataForSEO PAA", "type": "main", "index": 0 },
+        { "node": "Exa Search Reddit", "type": "main", "index": 0 },
+        { "node": "Exa Search Quora", "type": "main", "index": 0 },
+        { "node": "Exa Search Forums", "type": "main", "index": 0 },
+        { "node": "Exa Search YouTube", "type": "main", "index": 0 }
+      ]]
+    },
+    "DataForSEO PAA":     { "main": [[{ "node": "Parse PAA",     "type": "main", "index": 0 }]] },
+    "Exa Search Reddit":  { "main": [[{ "node": "Parse Reddit",  "type": "main", "index": 0 }]] },
+    "Exa Search Quora":   { "main": [[{ "node": "Parse Quora",   "type": "main", "index": 0 }]] },
+    "Exa Search Forums":  { "main": [[{ "node": "Parse Forums",  "type": "main", "index": 0 }]] },
+    "Exa Search YouTube": { "main": [[{ "node": "Parse YouTube", "type": "main", "index": 0 }]] },
+    "Parse PAA":      { "main": [[{ "node": "Merge Lanes", "type": "main", "index": 0 }]] },
+    "Parse Reddit":   { "main": [[{ "node": "Merge Lanes", "type": "main", "index": 1 }]] },
+    "Parse Quora":    { "main": [[{ "node": "Merge Lanes", "type": "main", "index": 2 }]] },
+    "Parse Forums":   { "main": [[{ "node": "Merge Lanes", "type": "main", "index": 3 }]] },
+    "Parse YouTube":  { "main": [[{ "node": "Merge Lanes", "type": "main", "index": 4 }]] },
+    "Merge Lanes":         { "main": [[{ "node": "Aggregate Evidence", "type": "main", "index": 0 }]] },
+    "Aggregate Evidence":  { "main": [[{ "node": "Has Evidence?",      "type": "main", "index": 0 }]] },
+    "Has Evidence?": {
+      "main": [
+        [{ "node": "Build LLM Payload",    "type": "main", "index": 0 }],
+        [{ "node": "No Evidence Fallback", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build LLM Payload":    { "main": [[{ "node": "OpenRouter Chat",    "type": "main", "index": 0 }]] },
+    "OpenRouter Chat":      { "main": [[{ "node": "Parse LLM Response", "type": "main", "index": 0 }]] },
+    "Parse LLM Response":   { "main": [[{ "node": "Respond with Results", "type": "main", "index": 0 }]] },
+    "No Evidence Fallback": { "main": [[{ "node": "Respond with Results", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "research-questions-v1",
+  "meta": {},
+  "id": "researchQuestions001",
+  "tags": []
+}

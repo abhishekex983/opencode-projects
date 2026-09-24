@@ -1,0 +1,52 @@
+{
+  "total_monthly_volume": 106750,
+  "unique_audience": 69387,
+  "tam": 97141,
+  "demographic_segments": [],
+  "geo_segments": [],
+  "intent_segments": {
+    "informational": {
+      "volume": 106750,
+      "pct": 100.0
+    }
+  },
+  "commercial_market": {
+    "audience_size": 0,
+    "avg_cpc": 1.63
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 0,
+    "declining": 0
+  },
+  "competition_level": "HIGH",
+  "avg_cpc": 1.63,
+  "report_id": "5aece1a1f271",
+  "description": "Australian travelers looking for Bali holiday packages and cheap flights",
+  "location_name": "Australia",
+  "language_code": "en",
+  "depth": "minimal",
+  "seed_keywords": [
+    "bali holiday packages",
+    "cheap flights to bali",
+    "bali all inclusive resorts",
+    "bali family holidays",
+    "bali honeymoon packages",
+    "flights to bali from sydney",
+    "flights to bali from melbourne",
+    "best time to visit bali",
+    "bali travel deals",
+    "bali villas with private pool",
+    "bali holiday packages from brisbane",
+    "bali flights sale",
+    "denpasar airport flights",
+    "bali surfing holidays",
+    "bali yoga retreats",
+    "bali luxury resorts",
+    "bali travel restrictions",
+    "bali visa requirements",
+    "best area to stay in bali",
+    "flights to bali comparison"
+  ],
+  "seed_count": 20
+}

@@ -1,0 +1,166 @@
+{
+  "name": "Writing Styles Registry",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Writing Styles Registry\n\nSingle webhook that returns the catalog of available writing styles.\n\n**Endpoint:** `POST /writing-styles`\n\n**Usage:**\n- The frontend fetches this on page load to populate the Writing Style dropdown.\n- The backend fetches style instructions when generating outlines/content.\n\n**To add a new style:**\n1. Edit the \"Return Catalog\" Code node\n2. Add a new entry to the `styles` array\n3. Deploy — available on all devices immediately",
+        "height": 300,
+        "width": 400
+      },
+      "id": "sticky-readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "writing-styles",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "writing-styles-webhook",
+      "name": "Writing Styles Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        0
+      ],
+      "webhookId": "writing-styles"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond-styles",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-test-styles",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Writing styles webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "respond-test-ok",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const styles = [\n  {\n    id: 'diggity',\n    name: 'Diggity Writing Style',\n    instructions: 'PRIORITY ONE: Readability Rules\\n\\n- Use 5th grade level language. Keep words simple. Short sentences. No jargon.\\n- Each paragraph should not be more than 3-4 lines. Break up long blocks of text.\\n\\nPRIORITY TWO: Diggity Writing Style\\n\\nWrite a blog post emulating Matt Diggity\\'s style. This includes:\\n\\n- Direct and conversational tone: casual, engaging, speaking directly to the audience. Use rhetorical questions, humor, and personal anecdotes.\\n- Data-driven approach: back up claims with data, examples, and real-world experiences.\\n- Actionable advice: clear, concise, practical steps readers can implement.\\n- Structure: compelling hook, clear topic introduction, in-depth information/examples, call to action.\\n\\nSemantic Triple Structure:\\nGenerate new, original sentences structured as semantic triples (subject-predicate-object). Weave them into grammatically correct sentences. Do not label the components. Make sure content is grammatically correct.'\n  },\n  {\n    id: 'writing-with-confidence',\n    name: 'Writing with Confidence',\n    instructions: 'PRIORITY ONE: Readability Rules\\n\\n- Use 5th grade level language. Keep words simple. Short sentences. No jargon.\\n- Each paragraph should not be more than 3-4 lines. Break up long blocks of text.\\n\\nPRIORITY TWO: WRITING WITH CONFIDENCE\\n\\nSECTION 1: Getting Started\\n- Overcome writer\\'s block by writing with purpose and showing up consistently.\\n- \"Don\\'s get it right, get it written\" — perfectionism kills momentum.\\n- Build the habit of regular writing.\\n\\nSECTION 2: Knowing Your Reader\\n- Practice empathy: see the world from your reader\\'s perspective.\\n- Use terms your reader would understand, not industry jargon.\\n- Apply the \"So what?\" test — ask what\\'s in it for the reader.\\n- Understand how readers actually read: they satisfice (scan for \"good enough\") in an F-pattern.\\n- Use the cocktail party effect: talk about the reader with \"You\" more than \"We\".\\n- Map your reader\\'s current perception of you vs. what you want them to think.\\n\\nSECTION 3: Write Less, Say More\\n- Replace lazy adjectives and adverbs with strong verbs (doing verbs).\\n- Use Hemingway App (hemingwayapp.com) to check readability.\\n- Eliminate filler words: driving, delivering, facilitating -> use direct verbs.\\n\\nSECTION 4: Get Your Message Across Widely\\n- Eliminate jargon — use simple, plain language.\\n- Watch out for the \"curse of knowledge\" — expertise can make you write for peers, not readers.\\n- Use splasho.com/upgoer5/ to test if your language is too complex.\\n\\nSECTION 5: Craft Sentences That Sing\\n- Keep sentences under 24 words (aim for Gunning Fog Index score 9 = 14-year-old comprehension).\\n- Read sentences aloud to check flow.\\n- Bring the main point to the beginning of paragraphs (don\\'s bury the lede).\\n- Focus on the \"doer\" (active voice): \"Scientists discovered...\" not \"It was discovered...\"\\n- Knit sentences: flow from known info to unknown info.\\n\\nSECTION 6: Incorporate Stories\\n- Show, don\\'s tell — paint pictures, don\\'s describe acts.\\n- Source stories from: clients, salespeople, social media comments, conversations.\\n- Be concrete, not abstract: you can paint a picture of a PIZZA but not \"Integrity\".\\n- Use \"Writer\\'s Diet\" — more verbs, fewer abstract nouns.\\n- Avoid filler words entirely.\\n- Create a swipefile of metaphors from everyday life (food, body, home, nature, work).\\n- Use metaphor templates: \"It\\'s a bit like...\", \"It\\'s similar to...\", \"It reminds me of...\"\\n- Structure stories: lead with the lede (most important point first), then build supporting details.\\n- Avoid passive verbs — test by excluding the \"doer\" and see if the sentence still makes sense.\\n- Relate data to stories readers can understand — give them the \"Aha!\" moment.'\n  },\n  {\n    id: 'reddit',\n    name: 'Reddit Writing Style',\n    instructions: 'PRIORITY ONE: Readability Rules\\n\\n- Use 5th grade level language. Keep words simple. Short sentences. No jargon.\\n- Each paragraph should not be more than 3-4 lines. Break up long blocks of text.\\n\\nPRIORITY TWO: Semantic Triple Structure\\n\\nGenerate new and original sentences that clearly express semantic triples within the content.\\n\\nEach sentence should naturally include:\\n- A subject that performs or experiences the action.\\n- A predicate that describes the action, state, or relationship.\\n- An object that receives the action or is connected to the subject.\\n\\nDo not label the components as \"Subject,\" \"Predicate,\" or \"Object.\" Instead, weave them into grammatically correct sentences.\\n\\nWrite sentences that communicate complete ideas while preserving a clear subject-action-object relationship.\\n\\nExamples:\\n- Customers trust products that solve their problems.\\n- Research reveals patterns that improve decision making.\\n- Your team delivers updates that keep clients informed.\\n\\nAvoid fragmented statements, vague references, and repetitive sentence structures.\\n\\nPRIORITY THREE: Writing Instructions\\n\\nVoice and Tone:\\n- Write in active voice. Example: \"Management canceled the meeting.\"\\n- Address readers directly using \"you\" and \"your\" when appropriate. Example: \"You\\'ll find these strategies save time.\"\\n- Stay direct and concise. Example: \"Call me at 3 p.m.\"\\n- Use simple language. Example: \"We need to fix this problem.\"\\n- Get straight to the point. Example: \"The project failed.\"\\n- Prioritize clarity over style. Example: \"Submit your expense report by Friday.\"\\n\\nSentence Structure:\\n- Mix short, medium, and long sentences to create a natural rhythm. Example: \"Stop. Think about what happened. Consider how we might prevent similar issues in the future.\"\\n- Write in a conversational manner. Example: \"But that\\'s not how it works in real life.\"\\n- Keep the writing grounded and realistic. Example: \"This approach has problems.\"\\n\\nWord Choice:\\n- Choose plain and practical language. Example: \"Our tool helps you track expenses.\"\\n- Use simplified grammar when it sounds natural. Example: \"Yeah, we can do that tomorrow.\"\\n- State information directly. Example: \"Here\\'s what we know.\"\\n\\nWhat to Replace:\\n- Replace cliches and jargon with specific, clear language. Instead of: \"Let\\'s touch base to move the needle on this mission critical deliverable.\" Write: \"Let\\'s meet to discuss how to improve this important project.\"\\n- Replace unnecessary conditional language with definitive statements when the evidence supports certainty. Instead of: \"This approach might improve results.\" Write: \"This approach improves results.\"\\n- Replace redundant phrases with single, precise words.\\n- Replace semicolons with periods or commas.\\n- Avoid hashtags, emojis, asterisks, and dashes. Use standard punctuation instead.'\n  },\n  {\n    id: 'abhi',\n    name: 'Abhi Writing Style',\n    instructions: 'PRIORITY ONE: Readability Rules\\n\\n- Use 5th grade level language. Keep words simple. Short sentences. No jargon.\\n- Each paragraph should not be more than 3-4 lines. Break up long blocks of text.\\n\\nPRIORITY TWO: ABHI WRITING STYLE\\n\\nSECTION 1: Title Rules\\n- The title must be attention-grabbing AND cover the main point of the content.\\n- No generic, vague titles. The reader should know exactly what they\\'ll get.\\n- Bad: \"The Ultimate Guide to Hair Styles\"\\n- Good: \"5 Hairstyles I Personally Tried That Made My Thin Hair Look Fuller\"\\n\\nSECTION 2: Write for One Person\\n- Write as if you\\'re talking to ONE specific person, not a crowd.\\n- Use \"you\" and \"your\" — never \"people\" or \"readers\" or \"everyone.\"\\n- Feel like a casual conversation at a party — relaxed, genuine, no corporate tone.\\n- Empathize with the reader. Acknowledge their struggle before offering solutions.\\n\\nSECTION 3: The \"So What → Ok → That\\'s Interesting\" Structure\\n\\nEvery paragraph or content block must follow this progression:\\n\\n1. START with the main point. Give the reader the answer immediately. No buildup, no preamble.\\n   - Reader thinks: \"So what? Everyone says that.\"\\n   \\n2. FOLLOW with evidence, context, or specifics that make the claim credible.\\n   - Reader thinks: \"Ok, that\\'s reasonable. I believe you.\"\\n   \\n3. END with something that piques curiosity or delivers a surprising insight.\\n   - Reader thinks: \"That\\'s interesting. I want to learn more.\"\\n\\nEXAMPLE (Cover Letter):\\n- Sentence 1: \"I believe my experience aligns closely with what you\\'re looking for.\"\\n  Reader: \"So what, everyone says that.\"\\n- Sentence 2: \"Right now, I work in the First Aid & CPR certification sector as an SEO strategist and marketing coordinator.\"\\n  Reader: \"Ok, same industry. That\\'s relevant.\"\\n- Sentence 3: \"I\\'ve played a key role in boosting our online course registrations — leading to a 30% increase in revenue.\"\\n  Reader: \"That\\'s interesting. 30% increase? Tell me more.\"\\n\\nEXAMPLE (Blog Intro):\\n- Bad: \"Thinning hair can feel like a personal battle, but it doesn\\'t have to define your style.\"\\n  Reader: \"So what, I read this everywhere.\"\\n- Good: \"I\\'ve been dealing with thin hair for the past five years, and I\\'ve finally discovered the hairstyles that really work for me.\"\\n  Reader: \"Ok, you have experience. What are those hairstyles?\"\\n\\nSECTION 4: No Fluff Rule (NON-NEGOTIABLE)\\n- Get straight to the point. Every sentence must earn its place.\\n- No beating around the bush. No filler intros. No generic statements.\\n- If a sentence doesn\\'t pass the \"So what?\" test from the reader\\'s perspective, delete it.\\n- Lead with substance, not style. Meat first, seasoning second.\\n- Never start with: \"In today\\'s world...\", \"It\\'s no secret that...\", \"Many people wonder...\", \"Have you ever thought about...\"\\n- Instead start with: the actual answer, a specific claim, or a concrete detail.\\n\\nSECTION 5: Empathy and Voice\\n- Acknowledge the reader\\'s frustration or situation BEFORE offering solutions.\\n- Use personal experience when possible — \"I tried this\", \"I found that\".\\n- Be honest about trade-offs. Don\\'t oversell.\\n- Write like a friend giving advice, not a marketer selling something.'\n  }\n];\n\nreturn { styles };"
+      },
+      "id": "return-catalog",
+      "name": "Return Catalog",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-with-styles",
+      "name": "Respond with Styles",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        400,
+        100
+      ]
+    }
+  ],
+  "connections": {
+    "Writing Styles Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Test?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Test?": {
+      "main": [
+        [
+          {
+            "node": "Respond Test OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Catalog": {
+      "main": [
+        [
+          {
+            "node": "Respond with Styles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

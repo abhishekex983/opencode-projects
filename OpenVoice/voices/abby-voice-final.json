@@ -1,0 +1,12 @@
+{
+  "name": "Abby Voice Final",
+  "embedding_path": "outputs_v2/abby-voice-final_v2_+9lq+wo+CQMydFbH_se.pth",
+  "reference_audio": "reference_audio/abby-voice-final.wav",
+  "default_speaker": "en-newest",
+  "default_speed": 1.0,
+  "description": "Custom voice for YouTube videos",
+  "created": "2026-08-07",
+  "source": "iPhone recording (online-voice-recorder.com)",
+  "duration_seconds": 242,
+  "sample_rate": 22050
+}

@@ -1,0 +1,37 @@
+{
+    "version": "0.1.20260520",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "time": "0 sec.",
+    "cost": 0,
+    "tasks_count": 1,
+    "tasks_error": 1,
+    "tasks": [
+        {
+            "id": "05250100-1270-0347-0000-6855344542a5",
+            "status_code": 40203,
+            "status_message": "The money limit per day has been exceeded: 10.02303 >= 10. You can modify your cost limit in the user panel https:\/\/app.dataforseo.com\/api-settings",
+            "time": "0 sec.",
+            "cost": 0,
+            "result_count": 0,
+            "path": [
+                "v3",
+                "backlinks",
+                "bulk_ranks",
+                "live"
+            ],
+            "data": {
+                "api": "backlinks",
+                "function": "bulk_ranks",
+                "targets": [
+                    "backsplash.com",
+                    "ramblingrenovators.ca",
+                    "roomfortuesday.com",
+                    "lemonthistle.com",
+                    "theinspiredroom.net"
+                ]
+            },
+            "result": null
+        }
+    ]
+}

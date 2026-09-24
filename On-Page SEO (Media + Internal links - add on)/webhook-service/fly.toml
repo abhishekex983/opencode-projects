@@ -1,0 +1,27 @@
+# Fly.io deployment config for the on-page SEO webhook service.
+# Region: Mumbai (closest to India). Change `primary_region` if you prefer
+# `sin` (Singapore), `fra` (Frankfurt), `iad` (US East), etc.
+
+app = "abhishek-onpage-webhooks"
+primary_region = "bom"
+
+[build]
+
+[env]
+  # server.js reads process.env.PORT and binds to it.
+  # Fly's load balancer routes external 80/443 → internal_port → this PORT.
+  PORT = "8080"
+  ALLOWED_ORIGINS = "*"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Auto-stop saves money: machine sleeps when idle, wakes on first request.
+  # Cold start is ~250ms — negligible vs the 20–60s the handler itself takes.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

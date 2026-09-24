@@ -1,0 +1,132 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1000px; height: 1500px; overflow: hidden;
+    font-family: 'Inter', sans-serif; background: #faf9fc; color: #1a1a2e;
+  }
+  .pin { width: 1000px; height: 1500px; position: relative; overflow: hidden; }
+  .header { background: #002444; padding: 32px 48px 26px; text-align: center; }
+  .logo { width: 200px; height: auto; margin-bottom: 12px; }
+  .title { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 54px; color: #fff; letter-spacing: -1px; line-height: 1.1; margin-bottom: 6px; }
+  .subtitle { font-weight: 400; font-size: 19px; color: rgba(255,255,255,0.7); margin-bottom: 14px; }
+  .header-line { width: 80px; height: 3px; background: #B91C1C; margin: 0 auto; border-radius: 2px; }
+  .body { padding: 20px 36px 0; }
+  .card { background: #fff; border-radius: 14px; padding: 22px 26px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; gap: 20px; align-items: flex-start; }
+  .card-image { width: 130px; min-width: 130px; height: 130px; object-fit: contain; border-radius: 10px; background: #f5f5f5; padding: 6px; }
+  .card-content { flex: 1; }
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; margin-bottom: 7px; }
+  .badge-red { background: #B91C1C; color: #fff; }
+  .badge-navy { background: #002444; color: #fff; }
+  .card-title { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 26px; color: #002444; margin-bottom: 2px; }
+  .card-subtitle { font-size: 12px; color: #6b7280; margin-bottom: 10px; font-weight: 500; }
+  .card-bullets { list-style: none; padding: 0; }
+  .card-bullets li { font-size: 13.5px; line-height: 1.45; padding: 2.5px 0; padding-left: 18px; position: relative; color: #1a1a2e; }
+  .card-bullets li::before { content: ''; position: absolute; left: 0; top: 9px; width: 7px; height: 7px; border-radius: 50%; background: #B91C1C; }
+  .card-warning { font-size: 11.5px; color: #B91C1C; font-weight: 600; margin-top: 7px; display: flex; align-items: center; gap: 5px; }
+  .combo-card { background: #fff; border-radius: 14px; padding: 20px 26px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border-left: 5px solid #B91C1C; }
+  .combo-title { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 22px; color: #002444; margin-bottom: 12px; display: flex; align-items: center; gap: 10px; }
+  .combo-grid { display: flex; gap: 12px; }
+  .combo-item { flex: 1; background: #f8f9fa; border-radius: 10px; padding: 12px 14px; text-align: center; }
+  .combo-item .freq { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 20px; color: #B91C1C; margin-bottom: 2px; }
+  .combo-item .prod { font-weight: 600; font-size: 13px; color: #002444; margin-bottom: 1px; }
+  .combo-item .desc { font-size: 11px; color: #6b7280; }
+  .combo-note { font-size: 11.5px; color: #B91C1C; font-weight: 600; margin-top: 10px; text-align: center; }
+  .stat-box { background: #B91C1C; border-radius: 14px; padding: 20px 28px; margin-bottom: 16px; text-align: center; color: #fff; }
+  .stat-number { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 48px; line-height: 1; margin-bottom: 4px; }
+  .stat-label { font-size: 15px; font-weight: 500; opacity: 0.95; }
+  .stat-sub { font-size: 11.5px; opacity: 0.75; margin-top: 3px; }
+  .tip-box { background: #fff; border-radius: 14px; padding: 16px 22px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border-left: 5px solid #B91C1C; display: flex; align-items: center; gap: 14px; }
+  .tip-icon { width: 34px; height: 34px; min-width: 34px; background: #FEF2F2; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .tip-icon svg { width: 18px; height: 18px; fill: #B91C1C; }
+  .tip-text { font-size: 13.5px; line-height: 1.45; color: #1a1a2e; font-weight: 500; }
+  .footer { background: #002444; padding: 20px 48px 24px; text-align: center; position: absolute; bottom: 0; left: 0; right: 0; }
+  .footer-line { width: 60px; height: 2px; background: #B91C1C; margin: 0 auto 12px; border-radius: 1px; }
+  .footer-url { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 17px; color: #fff; margin-bottom: 3px; }
+  .footer-tagline { font-size: 11.5px; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
+  .footer-disclaimer { font-size: 10px; color: rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+<div class="pin">
+  <div class="header">
+    <img class="logo" src="https://thinhairgrowthguide.com/wp-content/uploads/2026/08/Thin-Hair-Growth-Guide.png" alt="Thin Hair Growth Guide">
+    <div class="title">Nizoral vs Nioxin</div>
+    <div class="subtitle">Which One Is Right for You?</div>
+    <div class="header-line"></div>
+  </div>
+  <div class="body">
+    <div class="card">
+      <img class="card-image" src="file:///F:/Opencode Projects/Hair Restoration/Media/Nizoral Shampoo Front Picture.jpg" alt="Nizoral">
+      <div class="card-content">
+        <span class="badge badge-red">Anti-Dandruff</span>
+        <div class="card-title">Nizoral</div>
+        <div class="card-subtitle">Ketoconazole Shampoo</div>
+        <ul class="card-bullets">
+          <li>Clears dandruff and flaking</li>
+          <li>Reduces scalp itching</li>
+          <li>Calms inflammation</li>
+          <li>Creates healthier scalp environment</li>
+        </ul>
+        <div class="card-warning">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="#B91C1C"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+          May cause dryness / frizziness
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <img class="card-image" src="file:///F:/Opencode Projects/Hair Restoration/Media/All 3 products from Nioxin.png" alt="Nioxin Kit">
+      <div class="card-content">
+        <span class="badge badge-navy">Hair Thickening</span>
+        <div class="card-title">Nioxin</div>
+        <div class="card-subtitle">3-Product System Kit</div>
+        <ul class="card-bullets">
+          <li>Shampoo + Conditioner + Serum</li>
+          <li>Thicker, fuller-looking hair</li>
+          <li>Noticeable volume and body</li>
+          <li>Supports hair regrowth routine</li>
+        </ul>
+        <div class="card-warning">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="#B91C1C"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+          Requires consistent 3-product use
+        </div>
+      </div>
+    </div>
+    <div class="combo-card">
+      <div class="combo-title">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#002444" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Best Results: Use Both
+      </div>
+      <div class="combo-grid">
+        <div class="combo-item"><div class="freq">1x / week</div><div class="prod">Nizoral</div><div class="desc">Scalp health</div></div>
+        <div class="combo-item"><div class="freq">2x / week</div><div class="prod">Nioxin</div><div class="desc">Hair thickness</div></div>
+        <div class="combo-item"><div class="freq">Separate</div><div class="prod">Days</div><div class="desc">Never same day</div></div>
+      </div>
+      <div class="combo-note">Always consult your dermatologist first</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">17 - 50%</div>
+      <div class="stat-label">of people deal with dandruff</div>
+      <div class="stat-sub">Men are affected more than women</div>
+    </div>
+    <div class="tip-box">
+      <div class="tip-icon"><svg viewBox="0 0 24 24"><path d="M9 21c0 .5.4 1 1 1h4c.6 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.4 1 1 1h6c.6 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z"/></svg></div>
+      <div class="tip-text">Start with whichever problem bothers you most. Add the other product later.</div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-url">thinhairgrowthguide.com</div>
+    <div class="footer-tagline">Your Trusted Guide to Hair Growth</div>
+    <div class="footer-disclaimer">Consult your doctor before combining treatments</div>
+  </div>
+</div>
+</body>
+</html>

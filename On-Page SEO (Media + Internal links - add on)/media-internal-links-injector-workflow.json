@@ -1,0 +1,267 @@
+{
+  "name": "Media + Internal Links Injector",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Media + Internal Links Injector\n\n**Post-processing pass.** Takes final markdown content + a Media Library collection ID + a list of internal-link URLs, then asks an LLM to insert internal links, images, and YouTube embeds at contextually relevant spots WITHOUT rewriting the original prose.\n\n**Webhook:** `POST /webhook/enrich-content`\n\n**Input body:**\n- `content` (required, markdown string) — the final prose from Step 3\n- `internal_links` (optional, string[]) — list of internal URLs to weave in\n- `media_library_id` (optional, int) — Media Library collection ID (fetched via ml-manager webhook)\n- `focus_keyword` (optional, string) — for context\n\n**Output:**\n```json\n{\n  \"content\": \"...enriched markdown...\",\n  \"stats\": {\n    \"internal_links_inserted\": 3,\n    \"images_inserted\": 2,\n    \"youtube_links_inserted\": 1,\n    \"original_word_count\": 1450,\n    \"enriched_word_count\": 1475,\n    \"warning\": null\n  },\n  \"generated_at\": \"2026-07-26T...\"\n}\n```\n\n**Rule:** Original prose is preserved word-for-word. Only allowed change is wrapping existing words in markdown link syntax, plus inserting image/video lines at section boundaries.\n\n**Before running:**\n1. OPENROUTER_API_KEY is pre-filled (reused from existing workflows).\n2. Activate the workflow.\n3. Copy the Production webhook URL (`.../webhook/enrich-content`) into the on-page app's `Enrich Content Webhook` input.\n4. Webhook has `allowedOrigins: \"*\"` for CORS.\n\n**Model:** `anthropic/claude-sonnet-4.5` (configurable in the Build Enrich Prompt node).",
+        "height": 360,
+        "width": 380,
+        "color": 4
+      },
+      "id": "readme-sticky",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        200,
+        0
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "enrich-content",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "enrich-webhook",
+      "name": "Enrich Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        460,
+        300
+      ],
+      "typeVersion": 2,
+      "webhookId": "enrich-content"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Normalize inputs for the enrich-content webhook.\nconst input = $input.first().json;\nconst form = (input && typeof input.body === 'object' && input.body !== null && Object.keys(input.body).length > 0)\n  ? input.body\n  : input;\n\nconst norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst pick = (...keys) => {\n  for (const k of keys) {\n    if (form[k] !== undefined && form[k] !== null && form[k] !== '') return form[k];\n  }\n  const targets = keys.map(norm);\n  for (const k of Object.keys(form)) {\n    const n = norm(k);\n    if (targets.some(t => n === t || n.startsWith(t))) return form[k];\n  }\n  return '';\n};\n\nconst content = String(pick('content', 'markdown', 'final_content', 'edited_content') || '').trim();\nconst focusKeyword = String(pick('focus_keyword', 'Focus Keyword', 'focusKeyword') || '').trim();\n\nlet internalLinks = form.internal_links;\nif (typeof internalLinks === 'string') {\n  internalLinks = internalLinks.split(/[\\n,;]/).map(s => s.trim()).filter(Boolean);\n}\nif (Array.isArray(internalLinks)) {\n  internalLinks = internalLinks.filter(u => typeof u === 'string' && /^https?:\\/\\//.test(u));\n} else {\n  internalLinks = [];\n}\n\nconst mediaLibraryId = parseInt(pick('media_library_id', 'mediaLibraryId', 'ml_id')) || 0;\n\nif (!content) {\n  return [{ json: { error: 'content is required (non-empty markdown)' } }];\n}\n\nreturn [{\n  json: {\n    content,\n    focus_keyword: focusKeyword,\n    internal_links: internalLinks,\n    media_library_id: mediaLibraryId,\n    original_word_count: content.split(/\\s+/).filter(Boolean).length\n  }\n}];"
+      },
+      "id": "enrich-normalize",
+      "name": "Normalize Inputs",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        700,
+        300
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Fetch media library items if media_library_id is provided.\n// Passes through all form data from Normalize, adds media_items array.\n\nconst form = $('Normalize Inputs').first().json;\n\nif (form.error) {\n  return [{ json: form }];\n}\n\nconst mlId = form.media_library_id || 0;\n\nif (!mlId) {\n  return [{ json: { ...form, media_items: [] } }];\n}\n\ntry {\n  const ML_WEBHOOK = 'https://n8n.srv1195841.hstgr.cloud/webhook/ml-manager';\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: ML_WEBHOOK,\n    headers: { 'Content-Type': 'application/json' },\n    body: { action: 'list_items', collection_id: mlId },\n    json: true,\n    timeout: 15000\n  });\n\n  // n8n 'All Incoming Items' wraps response in array\n  const data = Array.isArray(resp) ? resp[0] : resp;\n  const items = data.items || [];\n  return [{ json: { ...form, media_items: items } }];\n} catch (e) {\n  return [{ json: { ...form, media_items: [], media_error: e.message } }];\n}\n"
+      },
+      "id": "enrich-fetch-media",
+      "name": "Fetch Media Items",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        920,
+        300
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Build the OpenRouter request body for the enrichment pass.\n//\n// Reused OPENROUTER_API_KEY. ENRICH_MODEL is swappable here.\n\nconst OPENROUTER_API_KEY = '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';\nconst ENRICH_MODEL      = 'anthropic/claude-sonnet-4.5';\n\nconst form = $('Fetch Media Items').first().json;\n\nif (form.error) {\n  return [{ json: form }];\n}\n\nif (!form.content) {\n  return [{ json: { error: 'content is required' } }];\n}\n\nconst systemPrompt =\n  'You are a precise content enrichment engine. Your job: take a finished markdown document and insert internal links, images, and YouTube videos at contextually relevant spots WITHOUT altering the original prose.\\n\\n' +\n  'ABSOLUTE RULES (NON-NEGOTIABLE):\\n' +\n  '1. PRESERVE PROSE WORD-FOR-WORD. Do not rewrite, paraphrase, reorder, add, restructure, or remove sentences. The ONLY allowed change is wrapping EXISTING words in markdown link syntax [existing words](URL) where an internal link is inserted, plus inserting image lines or YouTube standalone lines at section boundaries. Do not change punctuation, headings, or whitespace.\\n' +\n  '2. NEVER insert internal links inside the H1 line, inside the first paragraph (intro), or inside the conclusion section.\\n' +\n  '3. INTERNAL LINKS: Only link when the surrounding paragraph topic genuinely matches the URL path topic (derive the topic from the URL slug). Anchor text MUST be existing words drawn from the sentence being linked. Format: [existing words from the sentence](URL). Max 1 link per paragraph. Max 1 link per URL (do not reuse a URL). No more than 5 internal links total. Skip a URL if no paragraph is a real topical match -- never force.\\n' +\n  '4. IMAGES: Use markdown ![alt_text](url) on its own line, placed directly below the LAST paragraph of an H2 section where the image directly supports the content. Max 1 image per H2 section. Skip if no fit. Use the exact alt_text provided in the media library block.\\n' +\n  '5. YOUTUBE: Place as a standalone line directly below the H2 paragraph where the video is topically relevant. Format: [Watch: short descriptive label](URL). Max 1 YouTube link per blog post. Skip if no fit.\\n' +\n  '6. DO NOT add new headings, subheadings, bullet lists, or section breaks. DO NOT change heading text.\\n' +\n  '7. DO NOT add commentary, preambles, explanations, or summary text.\\n' +\n  '8. OUTPUT: Pure markdown only. The full enriched document (entire content, with insertions). No code fences, no wrapping, no extra text.\\n' +\n  '9. If no internal_links fit, no images fit, and no YouTube fits anywhere -- return the original markdown EXACTLY as received.\\n' +\n  '10. If <internal_links> is empty, skip internal linking entirely. If <media_library> is empty or missing, skip all media insertion.\\n' +\n  '11. PRESERVE the original H1 line exactly. PRESERVE list items exactly (you may insert a link inside a list item if rule 3 otherwise allows).\\n' +\n  '12. WORD COUNT TOLERANCE: Your output word count MUST be within +3% of the original (insertions add very few words). If you find yourself adding substantive prose, STOP -- you are breaking rule 1.';\n\nconst parts = [];\nparts.push('<original_content>');\nparts.push(form.content);\nparts.push('</original_content>');\nparts.push('');\n\nif (form.focus_keyword) {\n  parts.push('<focus_keyword>' + form.focus_keyword + '</focus_keyword>');\n  parts.push('');\n}\n\nconst internalLinks = form.internal_links || [];\nif (internalLinks.length > 0) {\n  parts.push('<internal_links>');\n  parts.push('Available internal URLs for contextual linking. Link ONLY where the surrounding paragraph topic genuinely matches the URL slug. Use existing words in the sentence as anchor text. Max 5 links total. Max 1 link per URL. Never force a fit.');\n  parts.push(internalLinks.map(u => '- ' + u).join('\\n'));\n  parts.push('</internal_links>');\n  parts.push('');\n} else {\n  parts.push('<internal_links>');\n  parts.push('(none -- skip internal linking)');\n  parts.push('</internal_links>');\n  parts.push('');\n}\n\nconst mediaItems = form.media_items || [];\nconst images = mediaItems.filter(i => i.media_type === 'image');\nconst videos = mediaItems.filter(i => i.media_type === 'youtube');\n\nif (images.length > 0 || videos.length > 0) {\n  parts.push('<media_library>');\n  parts.push('Available media for this content. Only insert where the surrounding section topic genuinely matches the media topic (derive from alt_text or filename).');\n  if (images.length > 0) {\n    parts.push('');\n    parts.push('IMAGES (insert as ![alt_text](url) on its own line at the END of the relevant H2 section, max 1 per H2):');\n    images.forEach(img => {\n      parts.push('- alt_text: \"' + (img.alt_text || 'image').replace(/\"/g, '\\\\\"') + '\" | url: ' + img.url);\n    });\n  }\n  if (videos.length > 0) {\n    parts.push('');\n    parts.push('YOUTUBE (insert as a standalone line directly below the relevant H2 paragraph, format: [Watch: short label](url). Max 1 per post):');\n    videos.forEach(v => {\n      parts.push('- url: ' + v.url + ' | label: ' + (v.alt_text || 'Watch video').replace(/[\\[\\]]/g, ''));\n    });\n  }\n  parts.push('</media_library>');\n  parts.push('');\n} else {\n  parts.push('<media_library>');\n  parts.push('(none -- skip media insertion)');\n  parts.push('</media_library>');\n  parts.push('');\n}\n\nparts.push('Enrich the <original_content> with internal links, images, and YouTube embeds following the ABSOLUTE RULES. Return only the full enriched markdown.');\n\nconst userPrompt = parts.join('\\n');\n\nreturn [{\n  json: {\n    form,\n    enrich_model: ENRICH_MODEL,\n    openrouter_api_key: OPENROUTER_API_KEY,\n    openrouter_request: {\n      model: ENRICH_MODEL,\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user',   content: userPrompt }\n      ],\n      temperature: 0.2,\n      max_tokens: 16384\n    }\n  }\n}];"
+      },
+      "id": "enrich-build-prompt",
+      "name": "Build Enrich Prompt",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1140,
+        300
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.openrouter_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://shettymarketing.com"
+            },
+            {
+              "name": "X-Title",
+              "value": "Media + Internal Links Injector (n8n)"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openrouter_request) }}",
+        "options": {
+          "timeout": 180000
+        }
+      },
+      "id": "enrich-openrouter",
+      "name": "OpenRouter (Enrich)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1360,
+        300
+      ],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Extract enriched markdown from OpenRouter response. Compute diff stats.\nconst resp = $input.first().json;\nconst payload = $('Build Enrich Prompt').first().json;\n\nif (payload.error) {\n  return [{ json: payload }];\n}\n\nif (resp.error) {\n  return [{ json: { error: 'OpenRouter returned error', detail: resp.error } }];\n}\n\nconst content = resp?.choices?.[0]?.message?.content;\nif (!content) {\n  return [{ json: { error: 'No content in OpenRouter response', raw: resp } }];\n}\n\n// Strip code fences if the LLM wrapped output in ```markdown ... ```.\nconst enriched = content\n  .replace(/^```(?:markdown|md)?\\s*/i, '')\n  .replace(/\\s*```\\s*$/i, '')\n  .trim();\n\nconst original = payload.form?.content || '';\nconst originalWordCount = payload.form?.original_word_count || original.split(/\\s+/).filter(Boolean).length;\nconst enrichedWordCount = enriched.split(/\\s+/).filter(Boolean).length;\n\n// Count existing markdown link occurrences in original vs enriched.\nconst mdLinkRe = /\\]\\((https?:\\/\\/[^\\s)]+)\\)/g;\nconst imgRe = /!\\[[^\\]]*\\]\\([^)]*\\)/g;\nconst ytRe = /(?:youtube\\.com\\/watch|youtu\\.be\\/)[^\\s)\\]]+/gi;\n\nfunction collectUrls(text, re) {\n  const set = new Set();\n  let m;\n  while ((m = re.exec(text)) !== null) {\n    set.add(m[1]);\n  }\n  return set;\n}\n\nconst originalLinkUrls = collectUrls(original, mdLinkRe);\n\n// Re-scan enriched with fresh regexes (exec stateful on global).\nconst enrichedLinkUrlsIter = (function* () {\n  const re = /\\]\\((https?:\\/\\/[^\\s)]+)\\)/g;\n  let m;\n  while ((m = re.exec(enriched)) !== null) yield m[1];\n})();\n\nconst providedInternalLinks = (payload.form?.internal_links || []).map(u => String(u).trim());\nlet internalLinksInserted = 0;\nfor (const u of enrichedLinkUrlsIter) {\n  if (providedInternalLinks.includes(u) && !originalLinkUrls.has(u)) {\n    internalLinksInserted += 1;\n  }\n}\n\nconst originalImgCount = (original.match(imgRe) || []).length;\nconst enrichedImgCount = (enriched.match(imgRe) || []).length;\nconst imagesInserted = Math.max(0, enrichedImgCount - originalImgCount);\n\nconst originalYtCount = (original.match(ytRe) || []).length;\nconst enrichedYtCount = (enriched.match(ytRe) || []).length;\nconst youtubeInserted = Math.max(0, enrichedYtCount - originalYtCount);\n\n// Word count delta check. If delta exceeds 5%, flag a warning (LLM may have rewritten prose).\nconst delta = Math.abs(enrichedWordCount - originalWordCount);\nconst deltaPct = originalWordCount > 0 ? (delta / originalWordCount) * 100 : 0;\nlet warning = null;\nif (deltaPct > 15) {\n  warning = 'prose_changed: enriched word count deviates ' + deltaPct.toFixed(1) + '% from original (insertions should add <15%). Manual review recommended.';\n}\n\nreturn [{\n  json: {\n    content: enriched,\n    stats: {\n      internal_links_inserted: internalLinksInserted,\n      images_inserted: imagesInserted,\n      youtube_links_inserted: youtubeInserted,\n      original_word_count: originalWordCount,\n      enriched_word_count: enrichedWordCount,\n      warning\n    },\n    usage: resp.usage || null,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "enrich-parse",
+      "name": "Parse + Diff",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1580,
+        300
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "enrich-respond",
+      "name": "Respond with JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        1820,
+        300
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "position": [
+        460,
+        560
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 500
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "error-respond",
+      "name": "Respond with Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        700,
+        560
+      ],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Enrich Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Inputs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Media Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Media Items": {
+      "main": [
+        [
+          {
+            "node": "Build Enrich Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Enrich Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenRouter (Enrich)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter (Enrich)": {
+      "main": [
+        [
+          {
+            "node": "Parse + Diff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse + Diff": {
+      "main": [
+        [
+          {
+            "node": "Respond with JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Respond with Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0
+}

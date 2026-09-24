@@ -1,0 +1,109 @@
+{
+  "name": "Knowledge Base Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kb-manager",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-1",
+      "name": "KB Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [460, 300],
+      "typeVersion": 2,
+      "webhookId": "kb-manager"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.knowledge_bases) staticData.knowledge_bases = [];\nif (!staticData.kb_documents) staticData.kb_documents = [];\nif (!staticData.next_kb_id) staticData.next_kb_id = 1;\nif (!staticData.next_doc_id) staticData.next_doc_id = 1;\n\nconst input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\nconst action = body.action || 'ping';\n\nfunction now() { return new Date().toISOString(); }\nlet result = {};\n\nswitch (action) {\n  case 'ping':\n    result = { ok: true, message: 'KB Manager webhook reachable', received_at: now() };\n    break;\n  case 'create_kb': {\n    const name = (body.name || '').trim();\n    if (!name) { result = { error: 'KB name is required.' }; break; }\n    const kb = { id: staticData.next_kb_id++, name, description: (body.description || '').trim(), created_at: now() };\n    staticData.knowledge_bases.push(kb);\n    result = { ok: true, knowledge_base: kb };\n    break;\n  }\n  case 'list_kbs': {\n    const kbs = staticData.knowledge_bases.map(kb => {\n      const docCount = staticData.kb_documents.filter(d => d.kb_id === kb.id).length;\n      return { ...kb, doc_count: docCount };\n    });\n    result = { knowledge_bases: kbs };\n    break;\n  }\n  case 'delete_kb': {\n    const kbId = parseInt(body.kb_id);\n    if (!kbId) { result = { error: 'kb_id is required.' }; break; }\n    const idx = staticData.knowledge_bases.findIndex(k => k.id === kbId);\n    if (idx === -1) { result = { error: 'KB not found.' }; break; }\n    staticData.knowledge_bases.splice(idx, 1);\n    staticData.kb_documents = staticData.kb_documents.filter(d => d.kb_id !== kbId);\n    result = { ok: true };\n    break;\n  }\n  case 'upload_doc': {\n    const kbId = parseInt(body.kb_id);\n    if (!kbId) { result = { error: 'kb_id is required.' }; break; }\n    const kb = staticData.knowledge_bases.find(k => k.id === kbId);\n    if (!kb) { result = { error: 'KB not found.' }; break; }\n    const filename = (body.filename || '').trim();\n    if (!filename) { result = { error: 'filename is required.' }; break; }\n    const content = (body.content || '').trim();\n    if (!content) { result = { error: 'content is required.' }; break; }\n    const docCount = staticData.kb_documents.filter(d => d.kb_id === kbId).length;\n    if (docCount >= 20) { result = { error: 'Max 20 documents per KB.' }; break; }\n    const doc = { id: staticData.next_doc_id++, kb_id: kbId, filename, content, file_size: parseInt(body.file_size) || content.length, uploaded_at: now() };\n    staticData.kb_documents.push(doc);\n    result = { ok: true, document: { id: doc.id, filename: doc.filename, file_size: doc.file_size } };\n    break;\n  }\n  case 'list_docs': {\n    const kbId = parseInt(body.kb_id);\n    if (!kbId) { result = { error: 'kb_id is required.' }; break; }\n    const docs = staticData.kb_documents.filter(d => d.kb_id === kbId).map(d => ({ id: d.id, filename: d.filename, file_size: d.file_size, uploaded_at: d.uploaded_at }));\n    result = { documents: docs };\n    break;\n  }\n  case 'delete_doc': {\n    const kbId = parseInt(body.kb_id);\n    const docId = parseInt(body.doc_id);\n    if (!kbId || !docId) { result = { error: 'kb_id and doc_id are required.' }; break; }\n    const idx = staticData.kb_documents.findIndex(d => d.id === docId && d.kb_id === kbId);\n    if (idx === -1) { result = { error: 'Document not found.' }; break; }\n    staticData.kb_documents.splice(idx, 1);\n    result = { ok: true };\n    break;\n  }\n  case 'get_content': {\n    const kbId = parseInt(body.kb_id);\n    if (!kbId) { result = { error: 'kb_id is required.' }; break; }\n    const kb = staticData.knowledge_bases.find(k => k.id === kbId);\n    if (!kb) { result = { error: 'KB not found.' }; break; }\n    const docs = staticData.kb_documents.filter(d => d.kb_id === kbId);\n    const text = docs.map(d => '## ' + d.filename + '\\n\\n' + d.content).join('\\n\\n---\\n\\n');\n    result = { kb_id: kbId, kb_name: kb.name, content: text, doc_count: docs.length };\n    break;\n  }\n  default:\n    result = { error: 'Unknown action: ' + action };\n}\nreturn [{ json: result }];"
+      },
+      "id": "code-1",
+      "name": "KB Manager Logic",
+      "type": "n8n-nodes-base.code",
+      "position": [700, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-1",
+      "name": "Respond with JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [940, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "position": [460, 500],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 500
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "error-respond",
+      "name": "Respond with Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [700, 500],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "KB Webhook": {
+      "main": [
+        [
+          {
+            "node": "KB Manager Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KB Manager Logic": {
+      "main": [
+        [
+          {
+            "node": "Respond with JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Respond with Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0
+}

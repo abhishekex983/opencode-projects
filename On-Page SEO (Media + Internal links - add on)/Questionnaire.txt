@@ -1,0 +1,19 @@
+Questionnaire:
+
+What is your USP?
+Answer: 
+Example: (Answer the question "What does the company sell", answer should start with "We sell....), Whatever you say after "sell" is your value proposition.
+
+Why us?
+Answer: 
+Example: A brief explanation of why prospects should buy your service and how it stands out from your competitors.
+
+Value proposition 1
+Value proposition 2
+Value proposition 3
+Example: ($400M annual comp supported, 360 degree SPM service, 50+ combined experience years) 
+
+What all services we offer
+Service 1
+Service 2
+Service 3

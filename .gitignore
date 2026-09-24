@@ -1,0 +1,87 @@
+# Ignore everything at root
+*
+
+# --- Track these folders and their contents ---
+!.gitignore
+!On-Page SEO (Media + Internal links - add on)/
+!On-Page SEO (Media + Internal links - add on)/**
+!Hair Restoration/
+!Hair Restoration/**
+!Resume 2026/
+!Resume 2026/**
+!Keyword Research/
+!Keyword Research/**
+!Social Media Posts-Image Generator/
+!Social Media Posts-Image Generator/**
+!Content Creation/
+!Content Creation/**
+!Gantt Chart - Take out notes/
+!Gantt Chart - Take out notes/**
+!OpenVoice/
+!OpenVoice/**
+!GanttBlazor/
+!GanttBlazor/**
+!Online Budget Calculator/
+!Online Budget Calculator/**
+!Shetty Marketing/
+!Shetty Marketing/**
+!Gantt Chart/
+!Gantt Chart/**
+!SEO suite/
+!SEO suite/**
+!Off Page SEO/
+!Off Page SEO/**
+!BJP Research/
+!BJP Research/**
+
+# --- Ignore inside tracked folders ---
+
+# Secrets
+**/.env
+**/.env.*
+**/*.env
+
+# API keys & credentials in plain text
+**/api-keys.txt
+**/api-keys*.txt
+**/DataforSEO credentials.txt
+**/DataforSEO Credentials and Documentation.txt
+**/Login Credentials.txt
+**/Google Drive Credentials.txt
+**/Datafor SEO new API.txt
+**/minimax api.txt
+**/Pexels.api.txt
+**/Kie.ai API.txt
+
+# Videos & audio
+**/*.mp4
+**/*.wav
+**/*.mp3
+
+# Python
+**/.venv/
+**/.venv-*/
+**/__pycache__/
+**/*.egg-info/
+**/*.pyc
+
+# Node
+**/node_modules/
+
+# Temp & tooling
+**/.tmp/
+**/.playwright-mcp/
+**/.opencode/node_modules/
+**/.screenshots/
+
+# Built/dist
+**/dist/
+**/build/
+
+# OAuth tokens
+**/token.json
+**/credentials.json
+
+# OS
+**/Thumbs.db
+**/.DS_Store

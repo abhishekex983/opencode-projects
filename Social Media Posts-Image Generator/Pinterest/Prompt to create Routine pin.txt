@@ -1,0 +1,186 @@
+Format: Portrait (2:3 ratio), Pinterest-optimized
+
+Objective:
+Create a high-converting Pinterest pin showcasing a routine, method, or step-by-step process. The design should feel like a premium editorial healthcare guide with clear visual flow and actionable steps.
+
+Content Source:
+Use information, key insights, and images from the referenced blog post.
+
+Brand Identity:
+Use colors and typography from the provided brand kit:
+{F:\Opencode Projects\Social Media Posts-Image Generator\Pinterest\Thin Hair Growth Guide Brand Colors.txt}
+
+Audience: Male
+- Tone: Direct, bold, no fluff
+- Visual: Sharp geometry, strong contrast
+- Colors: Cool/neutral tones
+- Messaging: Empowering, solution-focused
+
+Visual Style & Aesthetic:
+
+Premium editorial healthcare magazine style with step-by-step flow.
+
+Inspiration:
+- Men's Health workout routines
+- Forbes Health treatment protocols
+- Luxury skincare routine guides
+- Modern medical publication infographics
+
+Design Requirements:
+
+Layout Structure (Option A: Vertical Steps):
+┌─────────────────────────────────┐
+│  HEADLINE (top, full width)     │
+│  "The [X]-Step [Topic] Method" │
+├─────────────────────────────────┤
+│  STEP 1                         │
+│  [Icon] + [Action]              │
+├─────────────────────────────────┤
+│  STEP 2                         │
+│  [Icon] + [Action]              │
+├─────────────────────────────────┤
+│  STEP 3                         │
+│  [Icon] + [Action]              │
+├─────────────────────────────────┤
+│  STEP 4 (optional)              │
+│  [Icon] + [Action]              │
+├─────────────────────────────────┤
+│  CTA + LOGO                     │
+│  (bottom, full width)           │
+└─────────────────────────────────┘
+
+Layout Structure (Option B: Grid Steps):
+┌─────────────────────────────────┐
+│  HEADLINE (top, full width)     │
+│  "The Complete [Topic] Routine" │
+├─────────────────┬───────────────┤
+│  STEP 1         │  STEP 2       │
+│  [Icon]         │  [Icon]       │
+│  [Action]       │  [Action]     │
+├─────────────────┼───────────────┤
+│  STEP 3         │  STEP 4       │
+│  [Icon]         │  [Icon]       │
+│  [Action]       │  [Action]     │
+├─────────────────┴───────────────┤
+│  CTA + LOGO                     │
+│  (bottom, full width)           │
+└─────────────────────────────────┘
+
+- Large curiosity-driven headline at the top
+- Clear numbered steps with visual flow
+- Strong visual hierarchy:
+    1. Attention-grabbing headline
+    2. Numbered steps with icons
+    3. Supporting insight or CTA
+
+- Clean premium layout
+- Plenty of whitespace between steps
+- Modern typography
+- Professional medical trust aesthetic
+- Sophisticated and authoritative
+- Designed for Pinterest scrolling behavior
+
+Typography:
+
+- Bold headline typography
+- Step numbers: large, bold, red accent (#b91c1c)
+- Step text: clear, concise, dark navy
+- Maximum readability on mobile screens
+- Use short, powerful phrases
+- No small unreadable text
+- All text must be perfectly spelled and grammatically correct
+
+Color Direction:
+
+- Follow brand kit colors
+- Use subtle medical/wellness tones
+- Avoid overly bright marketing colors
+- Maintain premium brand consistency
+- Step numbers: red (#b91c1c) for emphasis
+- Step text: dark navy (#002444)
+- Background: white (#FFFFFF)
+
+Visual Elements:
+
+Include:
+- Provided blog image as hero reference
+- Minimal line art icons for each step
+- Clear numbering system
+- Subtle directional flow (arrows or lines)
+
+Avoid:
+- Generic stock routine layouts
+- Excessive icons
+- Cartoon illustrations
+- Cluttered information blocks
+- Fake statistics
+- AI-generated text inside images
+- Overly complex step descriptions
+
+Text Rules:
+
+The generated image must contain only:
+- Main headline ("The [X]-Step [Topic] Method" or similar)
+- Numbered steps (3-5 steps maximum)
+- Brief action text per step (2-4 words)
+- Optional CTA at bottom
+
+Do NOT add paragraphs or unnecessary text.
+
+## Logo Requirement (STRICT)
+
+Use ONLY the official Thin Hair Growth Guide logo. Do NOT generate or invent a logo.
+
+Logo files:
+- Light backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide logo.png
+- Dark backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide ( White logo).png
+
+Placement: Bottom-right corner, approximately 8-10% of image width.
+Maintain clear padding from edges.
+
+## Kie.ai API Configuration
+
+Endpoint: POST https://api.kie.ai/api/v1/jobs/createTask
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+
+Model: gpt-image-2-image-to-image
+
+Request Format (parameters go inside 'input' object):
+{
+  "model": "gpt-image-2-image-to-image",
+  "callBackUrl": "https://webhook.site/...",
+  "input": {
+    "prompt": "<your prompt here>",
+    "input_urls": ["<hero image URL>"],
+    "aspect_ratio": "2:3",
+    "resolution": "2K"
+  }
+}
+
+Polling (check task status):
+GET https://api.kie.ai/api/v1/jobs/recordInfo?taskId={taskId}
+
+Response format:
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "state": "success",
+    "resultJson": "{\"resultUrls\":[\"https://...\"]}"
+  }
+}
+
+References:
+
+Blog article:
+{Add blog URL}
+
+Brand kit:
+{Add brand kit URL}
+
+Blog images:
+Use hero image from blog post as visual reference. Extract routine/method steps from blog content.
+
+Final Output:
+A premium Pinterest pin with clear step-by-step routine, optimized for clicks, trust, and brand recognition.

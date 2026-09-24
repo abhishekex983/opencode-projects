@@ -1,0 +1,460 @@
+{
+  "name": "Search Intent Finder",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Search Intent Finder\n\n**Flow:**\n1. Webhook accepts `{ keywords: [...], location, language, device, industry }` (up to 25 keywords).\n2. Normalize input + build a single batched DataForSEO request (one task per keyword).\n3. DataForSEO `/serp/google/organic/live/advanced` returns all SERPs.\n4. DataForSEO Labs `/dataforseo_labs/google/bulk_keyword_difficulty/live` returns KD per keyword (one bulk call).\n5. Split Per Keyword: fan out one item per keyword with (a) regex-classified modifier signals, (b) pruned SERP (top 10 organic, PAA, features), (c) keyword_difficulty + difficulty_band attached.\n6. DataForSEO `/backlinks/bulk_pages_summary/live`: per-keyword call with the top 10 URLs - returns referring_domains + page rank per URL. Aggregated into `backlink_profile` with median stats and the weakest-position pointer (opportunity).\n7. Build LLM payload (per keyword) - system prompt enforces: trust SERP over modifiers when they conflict, output structured JSON with sub-intent weights summing to ~100.\n8. OpenRouter Chat (model: `google/gemini-2.5-flash`) returns JSON per keyword.\n9. Parse + normalize weights; attach keyword_difficulty + difficulty_band + backlink_profile to the intent_result.\n10. Aggregate into `{ results: [...] }` + respond (always JSON, even when individual keywords fail).\n\n**Before running:**\n- Activate workflow, copy Production URL into `on-page-app.html` -> Search Intent -> n8n Webhook URL field.\n- DataForSEO nodes (SERP, KD, Backlinks): all wired to your `Unnamed credential` (HTTP Basic Auth).\n- OpenRouter Chat node: replace `sk-or-v1-REPLACE-WITH-YOUR-OPENROUTER-KEY` in the Authorization header with your real OpenRouter key.\n- To swap models: change `model` in **Build LLM Payload** node.\n- CORS is `*` for local dev; lock it down for production.\n\n**Resilience:**\n- OpenRouter + Backlinks nodes both have `onError: continueRegularOutput` so per-keyword failures never abort the batch.\n- KD bulk failure degrades to `keyword_difficulty: null`; backlinks failure degrades to `backlink_profile: null`. Intent classification still ships.\n\n**Cost / latency:**\n- Batched DataForSEO SERP call: 1 API hit for N keywords.\n- KD bulk call: 1 API hit for N keywords (~$0.0001/kw).\n- Backlinks call: N hits (one per keyword, 10 URLs each) at ~$0.0067/kw.\n- LLM calls: N (one per keyword).\n- Plan ~15-40s per keyword end-to-end.",
+        "height": 720,
+        "width": 400
+      },
+      "id": "e59b2fa3-a189-4bbe-a799-36fa3125879c",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "search-intent",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "47b47792-532b-4ee4-afee-1a64abad2498",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 480],
+      "webhookId": "search-intent-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c49569ff-3490-4d18-96b8-dae3c5e40480",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Search Intent webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "d3dda067-6679-48eb-8f5d-68bcc237c9b5",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [608, 608]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\n\nlet keywords = [];\nif (Array.isArray(body.keywords)) {\n  keywords = body.keywords.map(k => String(k).trim()).filter(Boolean);\n} else if (typeof body.keyword === 'string' && body.keyword.trim()) {\n  keywords = [body.keyword.trim()];\n} else if (typeof body.keywords === 'string') {\n  keywords = body.keywords.split(/\\r?\\n/).map(s => s.trim()).filter(Boolean);\n}\n\nkeywords = [...new Set(keywords)];\n\nif (keywords.length === 0) throw new Error('No keywords provided.');\nif (keywords.length > 25) throw new Error('Maximum 25 keywords per batch (received ' + keywords.length + ').');\n\nreturn [{\n  json: {\n    keywords,\n    location: String(body.location || 'United States').trim(),\n    language: String(body.language || 'en').trim(),\n    device: String(body.device || 'desktop').trim(),\n    industry: String(body.industry || '').trim(),\n    requested_at: body.requested_at || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "f85f26ac-dd95-4b38-9e7e-d06fb7245dee",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [608, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst tasks = input.keywords.map(kw => ({\n  keyword: kw,\n  location_name: input.location,\n  language_code: input.language,\n  device: input.device,\n  depth: 20\n}));\nreturn [{ json: { ...input, dfs_body: tasks } }];"
+      },
+      "id": "1bbbbce8-8951-48bb-aa42-63e65a54725f",
+      "name": "Build DataForSEO Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/serp/google/organic/live/advanced",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.dfs_body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "5073c701-3796-4f86-9f5c-15e56ddccf62",
+      "name": "DataForSEO SERP (batch)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1008, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $('Normalize Input').first().json;\nconst serpResp = $input.first().json;\nreturn [{\n  json: {\n    serp_response: serpResp,\n    kd_body: [{\n      keywords: inputs.keywords,\n      location_name: inputs.location,\n      language_code: inputs.language\n    }]\n  }\n}];"
+      },
+      "id": "a1c9e2f3-b8d2-4f1a-9e7b-1c2d3e4f5a6b",
+      "name": "Build KD Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1216, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/bulk_keyword_difficulty/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.kd_body) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "b2d8a4e5-c9f3-5a2b-8c6d-2e3f4a5b6c7d",
+      "name": "DataForSEO KD (bulk)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1408, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $('Normalize Input').first().json;\nconst serpResp = $('DataForSEO SERP (batch)').first().json;\nconst kdResp = $input.first().json;\nconst tasks = (serpResp.tasks || []);\n\n// Build KD lookup map (keyword -> 0-100 score)\nconst kdMap = new Map();\nconst kdItems = kdResp && kdResp.tasks && kdResp.tasks[0] && kdResp.tasks[0].result && kdResp.tasks[0].result[0] && kdResp.tasks[0].result[0].items;\nif (Array.isArray(kdItems)) {\n  for (const it of kdItems) {\n    if (it && it.keyword) {\n      const kd = typeof it.keyword_difficulty === 'number' ? it.keyword_difficulty : null;\n      kdMap.set(String(it.keyword).toLowerCase(), kd);\n    }\n  }\n}\n\nfunction difficultyBand(kd) {\n  if (kd == null || Number.isNaN(kd)) return null;\n  if (kd < 15) return 'Very Easy';\n  if (kd < 30) return 'Easy';\n  if (kd < 50) return 'Medium';\n  if (kd < 70) return 'Hard';\n  if (kd < 85) return 'Very Hard';\n  return 'Super Hard';\n}\n\nfunction classifyModifiers(kw) {\n  const k = kw.toLowerCase();\n  const signals = { transactional: 0, commercial: 0, informational: 0, navigational: 0, local: 0 };\n  const hits = [];\n  if (/\\b(buy|purchase|order|book|schedule|hire|download|subscribe|sign[\\s-]?up)\\b/.test(k)) { signals.transactional += 3; hits.push('transactional verb'); }\n  if (/\\b(discount|coupon|deal|promo|price|pricing|cost|cheap|free trial)\\b/.test(k)) { signals.transactional += 2; hits.push('price/discount modifier'); }\n  if (/\\b(best|top|vs|versus|review|reviews|compare|comparison|alternative|alternatives)\\b/.test(k)) { signals.commercial += 3; hits.push('comparison/review modifier'); }\n  if (/\\b(pros and cons|worth it|good for|recommended)\\b/.test(k)) { signals.commercial += 2; hits.push('evaluation phrase'); }\n  if (/^(what|how|why|when|who|which|where|are|is|does|do|can|should)\\b/.test(k)) { signals.informational += 3; hits.push('question starter'); }\n  if (/\\b(guide|tutorial|how to|tips|learn|examples|definition|meaning|ideas|template)\\b/.test(k)) { signals.informational += 2; hits.push('learning modifier'); }\n  if (/\\b(login|sign in|dashboard|contact|support)\\b/.test(k)) { signals.navigational += 2; hits.push('navigational modifier'); }\n  if (/\\bnear\\s?me\\b/.test(k)) { signals.local += 4; hits.push('\\\"near me\\\"'); }\n  const ranked = Object.entries(signals).sort((a, b) => b[1] - a[1]);\n  return { signals, top_label: ranked[0][1] > 0 ? ranked[0][0] : null, top_score: ranked[0][1], hits };\n}\n\nfunction pruneSerp(taskResult) {\n  if (!taskResult) return null;\n  const items = (taskResult.items || []);\n  const organic = items.filter(i => i.type === 'organic').slice(0, 10).map(r => ({\n    position: r.rank_absolute,\n    title: r.title,\n    url: r.url,\n    description: r.description,\n    domain: r.domain\n  }));\n  const featured = items.find(i => i.type === 'featured_snippet') || null;\n  const answerBox = items.find(i => i.type === 'answer_box') || null;\n  const knowledgeGraph = items.find(i => i.type === 'knowledge_graph') || null;\n  const aiOverview = items.find(i => i.type === 'ai_overview') || null;\n  const paaItem = items.find(i => i.type === 'people_also_ask');\n  const paa = paaItem ? (paaItem.items || []).slice(0, 6).map(q => q.title).filter(Boolean) : [];\n  const relatedItem = items.find(i => i.type === 'related_searches');\n  const related = relatedItem ? (relatedItem.items || []).slice(0, 8) : [];\n  const localPack = items.filter(i => i.type === 'local_pack').slice(0, 3).map(p => ({ title: p.title, rating: p.rating && p.rating.value }));\n  const videoCarousel = items.find(i => i.type === 'video') || items.find(i => i.type === 'videos');\n  const shopping = items.find(i => i.type === 'shopping');\n  const imagePack = items.find(i => i.type === 'images');\n  const feature_presence = {\n    featured_snippet: !!featured,\n    answer_box: !!answerBox,\n    knowledge_graph: !!knowledgeGraph,\n    ai_overview: !!aiOverview,\n    people_also_ask: paa.length > 0,\n    local_pack: localPack.length > 0,\n    video_carousel: !!videoCarousel,\n    shopping_pack: !!shopping,\n    image_pack: !!imagePack\n  };\n  return {\n    organic,\n    featured_snippet: featured ? { title: featured.title, description: featured.description } : null,\n    knowledge_graph: knowledgeGraph ? { title: knowledgeGraph.title, description: knowledgeGraph.description } : null,\n    ai_overview: aiOverview ? { text: aiOverview.text } : null,\n    people_also_ask: paa,\n    related_searches: related,\n    local_pack: localPack,\n    feature_presence,\n    all_item_types: [...new Set(items.map(i => i.type))]\n  };\n}\n\nconst out = [];\nfor (let i = 0; i < inputs.keywords.length; i++) {\n  const kw = inputs.keywords[i];\n  const taskResult = tasks[i] && tasks[i].result && tasks[i].result[0];\n  const modifier = classifyModifiers(kw);\n  const serp = pruneSerp(taskResult);\n  const kd = kdMap.get(String(kw).toLowerCase());\n  out.push({\n    json: {\n      keyword: kw,\n      location: inputs.location,\n      language: inputs.language,\n      device: inputs.device,\n      industry: inputs.industry,\n      modifier,\n      serp,\n      serp_missing: !serp,\n      keyword_difficulty: typeof kd === 'number' ? kd : null,\n      difficulty_band: typeof kd === 'number' ? difficultyBand(kd) : null\n    }\n  });\n}\nreturn out;"
+      },
+      "id": "4e35f806-8e85-4b59-b53b-b311e16ef08c",
+      "name": "Split Per Keyword",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst targets = item.serp && Array.isArray(item.serp.organic)\n  ? item.serp.organic.map(r => r.url).filter(Boolean).slice(0, 10)\n  : [];\nreturn [{\n  json: {\n    ...item,\n    bl_body: [{ targets }],\n    bl_target_count: targets.length\n  }\n}];"
+      },
+      "id": "c3e9b5f6-d0a4-6b3c-9d7e-3f4a5b6c7d8e",
+      "name": "Build Backlinks Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1808, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/backlinks/bulk_pages_summary/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.bl_body) }}",
+        "options": {
+          "timeout": 45000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "d4faa6c7-e1b5-7c4d-ae8f-4a5b6c7d8e9f",
+      "name": "DataForSEO Backlinks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const upstream = $('Build Backlinks Request').first().json;\nconst blResp = $input.first().json;\nconst serp = upstream.serp;\nconst targetCount = upstream.bl_target_count;\n\nfunction median(nums) {\n  const arr = nums.filter(n => typeof n === 'number' && !Number.isNaN(n)).slice().sort((a, b) => a - b);\n  if (!arr.length) return null;\n  const mid = Math.floor(arr.length / 2);\n  return arr.length % 2 ? arr[mid] : Math.round((arr[mid - 1] + arr[mid]) / 2);\n}\n\nlet backlink_profile = null;\n\nif (serp && targetCount && blResp && Array.isArray(blResp.tasks)) {\n  const respItems = (blResp.tasks[0] && blResp.tasks[0].result) || [];\n  if (Array.isArray(respItems) && respItems.length) {\n    const byUrl = new Map();\n    for (const it of respItems) {\n      if (it && it.target) byUrl.set(String(it.target), it);\n    }\n\n    const perUrl = serp.organic.slice(0, 10).map(r => {\n      const data = byUrl.get(r.url) || {};\n      return {\n        position: r.position,\n        domain: r.domain,\n        url: r.url,\n        title: r.title,\n        backlinks: typeof data.backlinks === 'number' ? data.backlinks : null,\n        referring_domains: typeof data.referring_domains === 'number' ? data.referring_domains : null,\n        referring_main_domains: typeof data.referring_main_domains === 'number' ? data.referring_main_domains : null,\n        rank: typeof data.rank === 'number' ? data.rank : null\n      };\n    });\n\n    const aggregates = {\n      median_referring_domains: median(perUrl.map(p => p.referring_domains)),\n      median_rank: median(perUrl.map(p => p.rank))\n    };\n\n    const ranked = perUrl.filter(p => typeof p.rank === 'number');\n    if (ranked.length) {\n      const weakest = ranked.reduce((min, cur) => (cur.rank < min.rank ? cur : min), ranked[0]);\n      aggregates.weakest_position = weakest.position;\n      aggregates.weakest_rank = weakest.rank;\n    }\n\n    backlink_profile = { per_url: perUrl, aggregates };\n  }\n}\n\n// Strip transient fields, attach backlink_profile\nconst { bl_body, bl_target_count, ...rest } = upstream;\nreturn [{ json: { ...rest, backlink_profile } }];"
+      },
+      "id": "e5abb7d8-f2c6-8d5e-bf90-5b6c7d8e9fab",
+      "name": "Parse Backlinks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2192, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nif (item.serp_missing || !item.serp) {\n  return [{ json: { ...item, intent_result: { keyword: item.keyword, error: 'No SERP data returned by DataForSEO for this keyword.' } } }];\n}\n\nconst systemPrompt = [\n  'You are a senior SEO analyst specializing in search intent classification. Your job: classify a single keyword\\'s search intent using both query modifiers and the actual live SERP it returns, then produce an actionable JSON brief for a content writer.',\n  '',\n  'GROUNDING RULES (non-negotiable):',\n  '1. Use only facts from the <data> blocks. Do not invent SERP features, modifiers, or sub-intents.',\n  '2. When modifier-derived intent disagrees with SERP-derived intent, TRUST THE SERP. Set conflict=true and explain in conflict_message. Canonical example: the keyword \"macbook air pros and cons\" has modifier signals pointing to Commercial Investigation (product name + \"pros and cons\"), but if the SERP is dominated by editorial review articles, primary_intent is Informational and conflict is true.',\n  '3. Sub-intent weights MUST sum to ~100 and reflect the distribution of distinct user needs across the top 10 organic results + People Also Ask. Maximum 6 sub-intents. Group small ones into broader buckets. Each label is a short noun-phrase (e.g. \"Pros and cons / review\", \"Comparison vs other MacBooks\", \"Who should buy it\").',\n  '4. Confidence reflects signal agreement: 80-95 when modifier+SERP agree, 60-79 when partial conflict, 30-59 when SERP sharply overrides modifier or SERP is ambiguous.',\n  '',\n  'TAXONOMY:',\n  '- primary_intent: one of Informational | Commercial Investigation | Transactional | Navigational | Local',\n  '- secondary_intent: same set, or empty string if no meaningful secondary',\n  '- funnel_stage: Awareness | Interest | Consideration | Decision',\n  '',\n  'RECOMMENDED ARCHETYPES (pick one that matches primary_intent + sub-intents):',\n  'How-to article, Explainer / glossary, Listicle / roundup, Comparison / vs page, Review / pros-and-cons article, Product page, Category page, Pricing page, Local service page, Location landing page, Homepage / brand page',\n  '',\n  'SERP FEATURES (use canonical names): featured_snippet, answer_box, knowledge_graph, ai_overview, people_also_ask, local_pack, video_carousel, shopping_pack, image_pack, sitelinks, top_stories.',\n  'serp_features.present = the features that ACTUALLY exist in this SERP.',\n  'serp_features.to_win = the subset the new page should target (e.g. featured_snippet if there is a question-style sub-intent and no featured_snippet currently owned; people_also_ask if PAA is present).',\n  '',\n  'OUTPUT: valid JSON only. No markdown code fences. No prose outside JSON. Schema exactly:',\n  '{',\n  '  \"keyword\": \"string\",',\n  '  \"primary_intent\": \"Informational|Commercial Investigation|Transactional|Navigational|Local\",',\n  '  \"secondary_intent\": \"string\",',\n  '  \"funnel_stage\": \"Awareness|Interest|Consideration|Decision\",',\n  '  \"confidence\": integer 0-100,',\n  '  \"conflict\": boolean,',\n  '  \"conflict_message\": \"one sentence or empty string\",',\n  '  \"sub_intents\": [ { \"label\": \"string\", \"weight\": integer 0-100 } ],',\n  '  \"evidence\": [ \"Short bullet prefixed with [SERP], [MOD], or [PAA] showing the signal used.\" ],',\n  '  \"recommended_archetype\": \"string from the archetypes list\",',\n  '  \"archetype_rationale\": \"one sentence\",',\n  '  \"serp_features\": { \"present\": [\"...\"], \"to_win\": [\"...\"] }',\n  '}'\n].join('\\n');\n\nconst userPrompt = [\n  'KEYWORD: ' + item.keyword,\n  'LOCATION: ' + item.location,\n  'LANGUAGE: ' + item.language,\n  'DEVICE: ' + item.device,\n  item.industry ? ('INDUSTRY CONTEXT: ' + item.industry) : '',\n  '',\n  '<data source=\"MOD\" note=\"Regex-based modifier classification. top_label is the highest-scoring intent from query modifiers alone.\">',\n  JSON.stringify(item.modifier, null, 2),\n  '</data>',\n  '',\n  '<data source=\"SERP\" note=\"Pruned DataForSEO SERP. Top 10 organic + features + PAA + related searches.\">',\n  JSON.stringify(item.serp, null, 2),\n  '</data>',\n  '',\n  'Return only the JSON object as specified.'\n].filter(Boolean).join('\\n');\n\nreturn [{\n  json: {\n    ...item,\n    llm_request: {\n      model: 'google/gemini-2.5-flash',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userPrompt }\n      ],\n      temperature: 0.2,\n      response_format: { type: 'json_object' }\n    }\n  }\n}];"
+      },
+      "id": "b9542430-4551-41d7-955b-a2cdbf81db06",
+      "name": "Build LLM Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2384, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://shettymarketing.local/on-page-seo"
+            },
+            {
+              "name": "X-Title",
+              "value": "On-Page SEO :: Search Intent Finder"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.llm_request) }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "f98006f9-1567-45f6-b355-4a9fccefb326",
+      "name": "OpenRouter Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2576, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const upstream = $('Build LLM Payload').first().json;\n\n// Surface KD + backlink_profile alongside the intent result, regardless of LLM outcome.\nconst kdFields = {\n  keyword_difficulty: typeof upstream.keyword_difficulty === 'number' ? upstream.keyword_difficulty : null,\n  difficulty_band: upstream.difficulty_band || null\n};\nconst backlinkFields = { backlink_profile: upstream.backlink_profile || null };\n\nif (upstream.intent_result && upstream.intent_result.error) {\n  return [{ json: { intent_result: { ...upstream.intent_result, ...kdFields, ...backlinkFields } } }];\n}\n\nconst response = $input.first().json;\n\nif (response && response.error) {\n  const errMsg = (response.error.message || response.error.code || JSON.stringify(response.error));\n  return [{ json: { intent_result: { keyword: upstream.keyword, error: 'OpenRouter error: ' + errMsg, raw: response.error, ...kdFields, ...backlinkFields } } }];\n}\n\nconst text = response &&\n  response.choices &&\n  response.choices[0] &&\n  response.choices[0].message &&\n  response.choices[0].message.content;\n\nif (!text) {\n  return [{ json: { intent_result: { keyword: upstream.keyword, error: 'No content in OpenRouter response', raw: response, ...kdFields, ...backlinkFields } } }];\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch (e) {\n  const cleaned = text.replace(/^```json\\s*/i, '').replace(/```\\s*$/, '').trim();\n  try {\n    parsed = JSON.parse(cleaned);\n  } catch (e2) {\n    return [{ json: { intent_result: { keyword: upstream.keyword, error: 'Failed to parse JSON from model', raw_text: text, ...kdFields, ...backlinkFields } } }];\n  }\n}\n\nif (Array.isArray(parsed.sub_intents) && parsed.sub_intents.length) {\n  const total = parsed.sub_intents.reduce((s, x) => s + (Number(x.weight) || 0), 0);\n  if (total > 0 && Math.abs(total - 100) > 5) {\n    parsed.sub_intents = parsed.sub_intents.map(x => ({\n      label: x.label || '',\n      weight: Math.round((Number(x.weight) || 0) * 100 / total)\n    }));\n  }\n}\n\nparsed.keyword = parsed.keyword || upstream.keyword;\nObject.assign(parsed, kdFields, backlinkFields);\n\nreturn [{ json: { intent_result: parsed } }];"
+      },
+      "id": "ffc7e898-7ac3-42c5-b8fd-a3eddec4c048",
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2768, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\nconst inputs = $('Normalize Input').first().json;\n\nconst byKw = new Map();\nfor (const it of allItems) {\n  const r = it.json && it.json.intent_result;\n  if (r && r.keyword) byKw.set(r.keyword, r);\n}\n\nconst results = inputs.keywords.map(kw =>\n  byKw.get(kw) || { keyword: kw, error: 'No result returned from pipeline.' }\n);\n\nreturn [{\n  json: {\n    results,\n    request: {\n      keywords: inputs.keywords,\n      location: inputs.location,\n      language: inputs.language,\n      device: inputs.device,\n      industry: inputs.industry\n    },\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "5d8e1ecb-4d8b-48f7-858d-16f4096b3c05",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2960, 368]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "effabf20-64a6-4a73-bf93-5d587ad9a6a1",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [3152, 368]
+    },
+    {
+      "parameters": {
+        "content": "## How the fan-out works\n\n**Split Per Keyword** returns N items (one per keyword). Every node after it runs once per item - OpenRouter, Backlinks, etc. all get called N times automatically.\n\n**KD bulk call** happens once for the whole batch (before Split) - it's cheap (~$0.0001/kw) and DataForSEO Labs accepts up to 1000 keywords in one call. KD is attached to each item inside Split Per Keyword by looking up `$('DataForSEO KD (bulk)').first().json`.\n\n**Backlinks fan-out** happens after Split: Build Backlinks Request extracts the top-10 organic URLs from each item's pruned SERP, then DataForSEO Backlinks (`/backlinks/bulk_pages_summary/live`) gets called once per keyword with those URLs as `targets`. Parse Backlinks aggregates the response into `backlink_profile.per_url` + median stats + a weakest-position pointer (the lowest-rank URL = the most realistic outrank target).\n\n**Aggregate Results** uses `$input.all()` to collect the N parsed items back into a single `results: [...]` array. We order by the original `keywords` input so the response order matches the request order.\n\n**Conflict detection** lives in the LLM system prompt. The model compares the MOD block (modifier scores) to the SERP block (organic + features) and flips `conflict=true` when they disagree.\n\n**Error resilience:**\n- OpenRouter + KD + Backlinks all have `onError: continueRegularOutput` + `neverError: true`.\n- KD failure -> `keyword_difficulty: null`; Backlinks failure -> `backlink_profile: null`; LLM failure -> per-keyword `error` string.\n- Webhook always returns valid JSON.",
+        "height": 540,
+        "width": 380,
+        "color": 5
+      },
+      "id": "9bbe899d-886e-4a16-be2e-1634497ba9a6",
+      "name": "Fan-out Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1600, 0]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "Is Test?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Is Test?": {
+      "main": [
+        [
+          { "node": "Respond Test OK", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Normalize Input", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          { "node": "Build DataForSEO Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build DataForSEO Request": {
+      "main": [
+        [
+          { "node": "DataForSEO SERP (batch)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "DataForSEO SERP (batch)": {
+      "main": [
+        [
+          { "node": "Build KD Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build KD Request": {
+      "main": [
+        [
+          { "node": "DataForSEO KD (bulk)", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "DataForSEO KD (bulk)": {
+      "main": [
+        [
+          { "node": "Split Per Keyword", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Split Per Keyword": {
+      "main": [
+        [
+          { "node": "Build Backlinks Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build Backlinks Request": {
+      "main": [
+        [
+          { "node": "DataForSEO Backlinks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "DataForSEO Backlinks": {
+      "main": [
+        [
+          { "node": "Parse Backlinks", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Backlinks": {
+      "main": [
+        [
+          { "node": "Build LLM Payload", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build LLM Payload": {
+      "main": [
+        [
+          { "node": "OpenRouter Chat", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "OpenRouter Chat": {
+      "main": [
+        [
+          { "node": "Parse LLM Response", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse LLM Response": {
+      "main": [
+        [
+          { "node": "Aggregate Results", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          { "node": "Respond with Results", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fca716e9-f7c6-4b79-bbca-aa541c07fd8d",
+  "meta": {
+    "instanceId": "85aa62db498652bf5abcecbe93e8f8d7dc29c844051f21336ff396b0b8794328"
+  },
+  "id": "2IYZFGquUDbwRc8s",
+  "tags": []
+}

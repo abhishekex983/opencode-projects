@@ -1,0 +1,319 @@
+{
+  "name": "Marketing Insights -- Chat",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Marketing Insights -- Chat (Search-Augmented, 5 source kinds)\n\n**Endpoint:** `POST /marketing-insights-chat`\n\n**Source `kind` values handled:**\n- `web`     -- DataforSEO Google Organic SERP, site-restricted by host\n- `youtube` -- DataforSEO SERP with path-restricted site clause\n- `reddit`  -- Reddit's public search.json endpoint\n- `drive`   -- Semantic vector search over OpenAI-embedded Drive chunks stored in Supabase (populated by the Drive Indexer workflow)\n- `nifty`   -- Top 50 recent Nifty tasks AND messages (discussions) fetched via OAuth2, keyword-filtered in code. Citations show [Task] or [Discussion] prefix.\n- `fb`      -- skipped (private group, can't be searched)\n\n**Credentials baked in (delete the txt files in this folder after re-importing):**\n- DataforSEO login / password (Multi-Source Search node)\n- OpenRouter API key (Build Prompt node)\n- OpenAI API key + Supabase URL + Supabase service_role key (Drive Vector Search node)\n- Nifty OAuth2 credential (referenced by ID — same one used by the feed workflow)\n\n**Response:**\n```json\n{ \"answer\": \"...markdown with [N] citations...\", \"citations\": [{ n, source, source_label, url, title, snippet }] }\n```\n\nWebhook has `allowedOrigins: \"*\"` for browser CORS.",
+        "height": 460,
+        "width": 520
+      },
+      "id": "sticky-readme-chat",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1100, -320]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "marketing-insights-chat",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "chat-webhook",
+      "name": "Chat Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-520, 0],
+      "webhookId": "marketing-insights-chat"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-chat-test-cond",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "chat-is-test",
+      "name": "Is Chat Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-320, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Marketing Insights chat webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "chat-respond-test",
+      "name": "Respond Chat Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [-120, -200]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Normalize the incoming chat request. The frontend POSTs JSON; n8n wraps the\n// body under $json.body. Accept either shape.\nconst input = $input.first().json;\nconst form = (input && typeof input.body === 'object' && input.body !== null && Object.keys(input.body).length > 0)\n  ? input.body\n  : input;\n\nconst message = (form.message || form.text || '').toString().trim();\nconst history = Array.isArray(form.history) ? form.history.slice(-6) : [];\nconst sources = Array.isArray(form.sources) ? form.sources : [];\n\nif (!message) {\n  return [{ json: { __empty: true, error: 'Empty message' } }];\n}\n\n// Filter out FB group (can't be searched) and anything without a URL\nconst searchable = sources.filter(s => s && s.url && s.kind !== 'fb');\n\nreturn [{\n  json: {\n    message,\n    history,\n    sources: searchable,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "chat-normalize",
+      "name": "Normalize Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-120, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Parallel search across web + youtube + reddit sources.\n// Drive and Nifty are searched by separate downstream nodes that need n8n's\n// OAuth2 credentials (Code node can't access them directly).\n//\n// Web/YouTube: DataforSEO Google Organic SERP, site-restricted.\n// Reddit:      Reddit's public search.json endpoint.\n\nconst DATAFORSEO_LOGIN    = 'abhishekbolarshetty@gmail.com';\nconst DATAFORSEO_PASSWORD = '6aa69ca0a4bf8188';\nconst TOP_PER_SOURCE      = 3;\nconst FETCH_TOP_BODY      = true;\nconst BODY_CHARS          = 1500;\n\nconst form = $input.first().json;\nif (form.__empty) return [{ json: form }];\n\nconst message = form.message;\nconst sources = form.sources || [];\n\nconst auth = 'Basic ' + Buffer.from(DATAFORSEO_LOGIN + ':' + DATAFORSEO_PASSWORD).toString('base64');\n\nfunction parseUrl(s) {\n  const m = String(s || '').match(/^https?:\\/\\/([^\\/?#]+)(\\/[^?#]*)?/i);\n  return m ? { hostname: m[1], pathname: m[2] || '/' } : { hostname: '', pathname: '/' };\n}\n\nasync function searchWeb(source) {\n  const u = parseUrl(source.url);\n  const host = u.hostname.replace(/^www\\./, '');\n  const siteClause = (source.kind === 'youtube')\n    ? `site:youtube.com${u.pathname.replace(/\\/$/, '')}`\n    : `site:${host}`;\n  const keyword = `${siteClause} ${message}`;\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.dataforseo.com/v3/serp/google/organic/live/regular',\n      headers: { 'Authorization': auth, 'Content-Type': 'application/json' },\n      body: [{ keyword, language_code: 'en', location_code: 2840, depth: 10 }],\n      json: true,\n      timeout: 60000\n    });\n    const items = (resp && resp.tasks && resp.tasks[0] && resp.tasks[0].result && resp.tasks[0].result[0] && resp.tasks[0].result[0].items) || [];\n    return items\n      .filter(i => i.type === 'organic' && i.url)\n      .slice(0, TOP_PER_SOURCE)\n      .map(i => ({\n        title: i.title || '',\n        url: i.url,\n        snippet: i.description || '',\n        source: source.id,\n        source_label: source.label\n      }));\n  } catch (e) { return []; }\n}\n\nasync function searchReddit(source) {\n  const m = source.url.match(/\\/r\\/([^/]+)/);\n  if (!m) return [];\n  const sub = m[1];\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(message)}&restrict_sr=1&sort=relevance&limit=${TOP_PER_SOURCE}`,\n      headers: { 'User-Agent': 'marketing-insights-bot/0.3 by n8n' },\n      json: true,\n      timeout: 30000\n    });\n    const children = (resp && resp.data && resp.data.children) || [];\n    return children.slice(0, TOP_PER_SOURCE).map(c => ({\n      title: c.data.title || '',\n      url: 'https://www.reddit.com' + (c.data.permalink || ''),\n      snippet: (c.data.selftext || '').slice(0, 280),\n      source: source.id,\n      source_label: source.label\n    }));\n  } catch (e) { return []; }\n}\n\nasync function searchBroadReddit(query) {\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'GET',\n      url: `https://www.reddit.com/search.json?q=${encodeURIComponent(query)}&sort=relevance&limit=8`,\n      headers: { 'User-Agent': 'marketing-insights-bot/0.3 by n8n' },\n      json: true, timeout: 30000\n    });\n    const children = (resp && resp.data && resp.data.children) || [];\n    return children.slice(0, 8).map(c => ({\n      title: c.data.title || '',\n      url: 'https://www.reddit.com' + (c.data.permalink || ''),\n      snippet: (c.data.selftext || '').slice(0, 280),\n      source: 'r/' + (c.data.subreddit || 'reddit'),\n      source_label: 'r/' + (c.data.subreddit || 'reddit')\n    }));\n  } catch (e) { return []; }\n}\n\nasync function searchBroadYouTube(query) {\n  try {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.dataforseo.com/v3/serp/google/organic/live/regular',\n      headers: { 'Authorization': auth, 'Content-Type': 'application/json' },\n      body: [{ keyword: `site:youtube.com ${query}`, language_code: 'en', location_code: 2840, depth: 10 }],\n      json: true, timeout: 60000\n    });\n    const items = (resp && resp.tasks && resp.tasks[0] && resp.tasks[0].result && resp.tasks[0].result[0] && resp.tasks[0].result[0].items) || [];\n    return items\n      .filter(i => i.type === 'organic' && i.url && (i.url.indexOf('youtube.com') !== -1 || i.url.indexOf('youtu.be') !== -1))\n      .slice(0, 8)\n      .map(i => ({\n        title: i.title || '',\n        url: i.url,\n        snippet: i.description || '',\n        source: 'youtube',\n        source_label: 'YouTube'\n      }));\n  } catch (e) { return []; }\n}\n\nconst boundSearchWeb     = searchWeb.bind(this);\nconst boundSearchReddit  = searchReddit.bind(this);\nconst boundSearchBroadReddit  = searchBroadReddit.bind(this);\nconst boundSearchBroadYouTube = searchBroadYouTube.bind(this);\n\nconst searchPromises = sources.map(s => {\n  if (s.kind === 'reddit') return boundSearchReddit(s);\n  if (s.kind === 'web' || s.kind === 'youtube') return boundSearchWeb(s);\n  return Promise.resolve([]);\n});\n\nconst [sourceNested, broadReddit, broadYouTube] = await Promise.all([\n  Promise.all(searchPromises),\n  boundSearchBroadReddit(message),\n  boundSearchBroadYouTube(message)\n]);\n\n// Dedupe across all hit arrays by URL.\nconst _seen = new Set();\nconst hits = [].concat(sourceNested.flat(), broadReddit, broadYouTube).filter(h => {\n  const u = (h.url || '').split('#')[0];\n  if (!u || _seen.has(u)) return false;\n  _seen.add(u);\n  return true;\n});\n\n// Fetch body for the top hit per source (skip YouTube: JS-rendered)\nif (FETCH_TOP_BODY) {\n  const topPerSource = {};\n  for (const h of hits) if (!topPerSource[h.source]) topPerSource[h.source] = h;\n  const tops = Object.values(topPerSource).filter(h => {\n    const s = sources.find(x => x.id === h.source);\n    return !(s && s.kind === 'youtube');\n  });\n  await Promise.all(tops.map(async (h) => {\n    try {\n      const html = await this.helpers.httpRequest({\n        method: 'GET', url: h.url,\n        headers: {\n          'User-Agent': 'Mozilla/5.0 (compatible; MarketingInsights/0.3; +https://shettymarketing.com)',\n          'Accept': 'text/html,application/xhtml+xml'\n        },\n        timeout: 20000, json: false\n      });\n      const text = String(html)\n        .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n        .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n        .replace(/<noscript[\\s\\S]*?<\\/noscript>/gi, ' ')\n        .replace(/<[^>]+>/g, ' ')\n        .replace(/&nbsp;/g, ' ')\n        .replace(/\\s+/g, ' ')\n        .trim()\n        .slice(0, BODY_CHARS);\n      h.body = text;\n    } catch (e) { h.body = ''; }\n  }));\n}\n\n// Build Drive query: extract the 3-5 most-significant keywords from the\n// user's message and OR them with fullText contains. A literal full-phrase\n// match almost never works (people don't write docs that copy a question\n// verbatim) -- token-OR matches anything topically relevant.\nconst _stop = new Set(['the','a','an','is','are','for','of','to','and','or','in','on','at','with','vs','vs.','my','our','your','i','we','it','this','that','do','does','what','why','how','when','where','should','could','would','can','will','about','from','have','has','had','been','was','were','also','more','than','use','using','using','make','best','good']);\nconst _kws = String(message)\n  .toLowerCase()\n  .split(/[^a-z0-9]+/)\n  .filter(t => t.length > 3 && !_stop.has(t))\n  .slice(0, 5);\n\nlet drive_query;\nif (_kws.length) {\n  const _orClause = _kws.map(k => `fullText contains '${k.replace(/'/g, \"\\\\'\")}'`).join(' or ');\n  drive_query = `(${_orClause}) and trashed = false and mimeType != 'application/vnd.google-apps.folder'`;\n} else {\n  const _safeMsg = message.replace(/'/g, \"\\\\'\");\n  drive_query = `fullText contains '${_safeMsg}' and trashed = false and mimeType != 'application/vnd.google-apps.folder'`;\n}\n\nreturn [{\n  json: {\n    message,\n    history: form.history,\n    sources: sources,\n    hits,\n    drive_query\n  }\n}];"
+      },
+      "id": "chat-multi-search",
+      "name": "Multi-Source Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [100, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Embed the chat message via OpenAI, then query Supabase for semantically\n// similar Drive doc chunks. Replaces the old Drive keyword search.\n//\n// ----- CONFIG (paste your secrets below) ----------------------\nconst OPENAI_API_KEY      = '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';\nconst SUPABASE_URL        = 'https://xirmohenadyurcwlnchy.supabase.co';\nconst SUPABASE_KEY        = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpcm1vaGVuYWR5dXJjd2xuY2h5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQxMDU4MCwiZXhwIjoyMDk0OTg2NTgwfQ.WcUpZXQHJ57z0Qm8Cd-V0oYl2KzHwbae-Qv4L9e1w_8';\nconst EMBEDDING_MODEL     = 'text-embedding-3-small';\nconst MATCH_COUNT         = 8;\nconst SIMILARITY_THRESHOLD = 0.3;\n// --------------------------------------------------------------\n\nconst prev = $input.first().json;\nif (prev.__empty) return [{ json: prev }];\n\nconst message = prev.message;\n\n// Bail gracefully if Supabase/OpenAI not yet configured -- chat still works\n// against the other sources (web/youtube/reddit/nifty).\nconst notConfigured = !OPENAI_API_KEY || OPENAI_API_KEY.indexOf('REPLACE_ME') === 0\n  || !SUPABASE_URL || SUPABASE_URL.indexOf('REPLACE_ME') === 0\n  || !SUPABASE_KEY || SUPABASE_KEY.indexOf('REPLACE_ME') === 0;\nif (notConfigured) {\n  return [{ json: { ...prev, drive_chunks: [], drive_search_skipped: true } }];\n}\n\n// 1. Embed the query\nlet queryEmbedding;\ntry {\n  const embedResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/embeddings',\n    headers: {\n      Authorization: `Bearer ${OPENAI_API_KEY}`,\n      'Content-Type': 'application/json'\n    },\n    body: { input: message, model: EMBEDDING_MODEL },\n    json: true, timeout: 30000\n  });\n  queryEmbedding = embedResp && embedResp.data && embedResp.data[0] && embedResp.data[0].embedding;\n  if (!Array.isArray(queryEmbedding)) throw new Error('No embedding returned');\n} catch (e) {\n  return [{ json: { ...prev, drive_chunks: [], drive_search_error: String(e.message || e).slice(0, 200) } }];\n}\n\n// 2. Vector similarity search via Supabase RPC\nlet chunks = [];\ntry {\n  chunks = await this.helpers.httpRequest({\n    method: 'POST',\n    url: `${SUPABASE_URL}/rest/v1/rpc/match_marketing_doc_chunks`,\n    headers: {\n      apikey: SUPABASE_KEY,\n      Authorization: `Bearer ${SUPABASE_KEY}`,\n      'Content-Type': 'application/json'\n    },\n    body: {\n      query_embedding: queryEmbedding,\n      match_count: MATCH_COUNT,\n      similarity_threshold: SIMILARITY_THRESHOLD\n    },\n    json: true, timeout: 30000\n  });\n  if (!Array.isArray(chunks)) chunks = [];\n} catch (e) {\n  return [{ json: { ...prev, drive_chunks: [], drive_search_error: String(e.message || e).slice(0, 200) } }];\n}\n\nreturn [{ json: { ...prev, drive_chunks: chunks } }];"
+      },
+      "id": "chat-drive-vector-search",
+      "name": "Drive Vector Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [320, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Merge Supabase vector-search chunks into the running hits array, tagged\n// source='drive'. Each chunk contains the actual document text so the LLM\n// can quote / paraphrase it -- not just see a filename.\n//\n// Multiple chunks may come from the same file; we group them under one citation\n// per file (taking the highest-similarity chunk's metadata + concatenating\n// snippet text up to ~600 chars).\n\nconst prev   = $input.first().json;\nconst chunks = prev.drive_chunks || [];\n\nfunction friendlyType(m) {\n  const map = {\n    'application/vnd.google-apps.document':     'Doc',\n    'application/vnd.google-apps.spreadsheet':  'Sheet'\n  };\n  return map[m] || 'File';\n}\n\n// Group by drive_file_id, keep top similarity per file, concat content snippets\nconst byFile = new Map();\nfor (const c of chunks) {\n  if (!c || !c.drive_file_id) continue;\n  const existing = byFile.get(c.drive_file_id);\n  if (!existing) {\n    byFile.set(c.drive_file_id, {\n      drive_file_id: c.drive_file_id,\n      file_name: c.file_name,\n      file_url:  c.file_url,\n      mime_type: c.mime_type,\n      modified_time: c.modified_time,\n      top_similarity: c.similarity,\n      content_parts: [c.content]\n    });\n  } else {\n    if (c.similarity > existing.top_similarity) existing.top_similarity = c.similarity;\n    if (existing.content_parts.length < 3) existing.content_parts.push(c.content);\n  }\n}\n\n// Sort by top similarity, take top 5 files\nconst topFiles = Array.from(byFile.values())\n  .sort((a, b) => b.top_similarity - a.top_similarity)\n  .slice(0, 5);\n\nconst driveHits = topFiles.map(f => {\n  const combinedBody = f.content_parts.join('\\n\\n---\\n\\n');\n  const snippetText  = combinedBody.replace(/^\\[Source: [^\\]]+\\]\\n/g, '').replace(/\\s+/g, ' ').slice(0, 280);\n  return {\n    title: f.file_name,\n    url:   f.file_url,\n    snippet: snippetText,\n    body:    combinedBody.slice(0, 2000),\n    source: 'drive',\n    source_label: 'My Google Drive (' + friendlyType(f.mime_type) + ')'\n  };\n});\n\nconst hits = (prev.hits || []).concat(driveHits);\n\nreturn [{\n  json: {\n    message: prev.message,\n    history: prev.history,\n    sources: prev.sources,\n    hits,\n    drive_search_skipped: prev.drive_search_skipped || false,\n    drive_search_error:   prev.drive_search_error   || null\n  }\n}];"
+      },
+      "id": "chat-merge-drive",
+      "name": "Merge Drive Hits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://openapi.niftypm.com/api/v1.0/tasks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "ordering", "value": "-updated_at" },
+            { "name": "limit", "value": "50" }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 25000
+        }
+      },
+      "id": "chat-nifty-search",
+      "name": "Nifty Tasks Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 0],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "hZmpM4h6XQ3jWOWq",
+          "name": "Unnamed credential 2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Fetches 50 most-recently-updated Nifty tasks. Keyword scoring happens in Merge Nifty Hits."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://openapi.niftypm.com/api/v1.0/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "ordering", "value": "-updated_at" },
+            { "name": "limit", "value": "50" }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 25000
+        }
+      },
+      "id": "chat-nifty-messages",
+      "name": "Nifty Messages Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 0],
+      "credentials": {
+        "oAuth2Api": {
+          "id": "hZmpM4h6XQ3jWOWq",
+          "name": "Unnamed credential 2"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Fetches 50 most-recent Nifty messages (project discussion threads — what Nifty calls 'comments'). Keyword scoring happens in Merge Nifty Hits."
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Keyword-score Nifty Tasks AND Messages against the chat message, merge top\n// matches into hits as separate entries tagged source='nifty'.\n// Nifty's API has no search param, so we filter client-side.\n//\n// Tasks come from $('Nifty Tasks Search'); Messages from current input ($json).\n\nconst prev          = (($('Merge Drive Hits').first()      || {}).json) || {};\nconst tasksBody     = (($('Nifty Tasks Search').first()    || {}).json) || {};\nconst messagesBody  = $json || {};\n\nfunction extractList(body) {\n  if (Array.isArray(body)) return body;\n  return body.data || body.tasks || body.messages || body.results || body.items || [];\n}\n\nconst tasks    = extractList(tasksBody);\nconst messages = extractList(messagesBody);\n\nconst messageLower = String(prev.message || '').toLowerCase();\nconst stop = new Set(['the','a','an','is','are','for','of','to','and','or','in','on','at','with','vs','vs.','my','our','your','i','we','it','this','that','do','does','what','why','how','when','where','should','could','would','can','will','about','from']);\nconst tokens = messageLower\n  .split(/[^a-z0-9]+/)\n  .filter(t => t.length > 2 && !stop.has(t));\n\nfunction scoreText(text) {\n  if (!text) return 0;\n  const t = String(text).toLowerCase();\n  return tokens.reduce((s, tok) => s + (t.includes(tok) ? 1 : 0), 0);\n}\n\nfunction scoreTask(t) {\n  return scoreText((t.name || '') + ' ' + (t.description_text || t.description || ''));\n}\nfunction scoreMessage(m) {\n  return scoreText(\n    (m.name || m.title || '') + ' ' +\n    (m.description_text || m.description || m.body || m.content || '')\n  );\n}\n\nconst topTasks = (Array.isArray(tasks) ? tasks : [])\n  .map(t => ({ t, score: scoreTask(t) }))\n  .filter(x => x.score > 0)\n  .sort((a, b) => b.score - a.score)\n  .slice(0, 5);\n\nconst topMessages = (Array.isArray(messages) ? messages : [])\n  .map(m => ({ m, score: scoreMessage(m) }))\n  .filter(x => x.score > 0)\n  .sort((a, b) => b.score - a.score)\n  .slice(0, 5);\n\nconst taskHits = topTasks.map(({ t }) => {\n  const projectId = t.project || t.project_id || (t.project_data && t.project_data.id) || '';\n  const taskId    = t.id || '';\n  const url = t.url || (projectId && taskId\n    ? `https://app.niftypm.com/projects/${projectId}/tasks/${taskId}`\n    : 'https://app.niftypm.com/');\n  return {\n    title: '[Task] ' + (t.name || t.title || '(untitled task)'),\n    url,\n    snippet: String(t.description_text || t.description || '').slice(0, 280),\n    source: 'nifty',\n    source_label: 'NiftyPM (Task)'\n  };\n});\n\nconst messageHits = topMessages.map(({ m }) => {\n  const projectId = m.project || m.project_id || (m.project_data && m.project_data.id) || '';\n  const messageId = m.id || '';\n  const url = m.url || (projectId && messageId\n    ? `https://app.niftypm.com/projects/${projectId}/discussions/${messageId}`\n    : 'https://app.niftypm.com/');\n  return {\n    title: '[Discussion] ' + (m.name || m.title || '(untitled discussion)'),\n    url,\n    snippet: String(m.description_text || m.description || m.body || m.content || '').slice(0, 280),\n    source: 'nifty',\n    source_label: 'NiftyPM (Discussion)'\n  };\n});\n\nconst hits = (prev.hits || []).concat(taskHits, messageHits);\n\n// Final renumbering across all sources for citation references\nhits.forEach((h, i) => { h.n = i + 1; });\n\nreturn [{\n  json: {\n    message: prev.message,\n    history: prev.history,\n    sources_used: (prev.sources || []).map(s => ({ id: s.id, label: s.label })),\n    hits\n  }\n}];"
+      },
+      "id": "chat-merge-nifty",
+      "name": "Merge Nifty Hits",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Build the OpenRouter request body.\n\nconst OPENROUTER_API_KEY = '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';\nconst MODEL              = 'anthropic/claude-sonnet-4.5';\n\nconst _key = String(OPENROUTER_API_KEY || '').trim();\nif (!_key || _key.indexOf('REPLACE_ME') === 0) {\n  return [{ json: { __passthrough_error: {\n    error: 'OpenRouter API key not configured',\n    detail: 'The OPENROUTER_API_KEY constant in the \"Build Prompt\" Code node is empty or still the REPLACE_ME placeholder.',\n    hint: 'Open the \"Build Prompt\" node in the n8n editor, replace OPENROUTER_API_KEY with your real key from https://openrouter.ai/keys (looks like sk-or-v1-...), save the node, then save + re-activate the workflow.'\n  }}}];\n}\n\nconst data = $input.first().json;\n\nif (data.__empty || data.error) {\n  return [{ json: { __passthrough_error: { error: data.error || 'Empty input', detail: data } } }];\n}\n\nconst message  = data.message;\nconst history  = data.history || [];\nconst hits     = data.hits || [];\n\nconst sourcesBlock = hits.length\n  ? hits.map(h => `<source n=\"${h.n}\" id=\"${h.source}\" url=\"${h.url}\">\\ntitle: ${h.title}\\nsnippet: ${h.snippet || ''}${h.body ? `\\n---\\nbody:\\n${h.body}` : ''}\\n</source>`).join('\\n\\n')\n  : '(no sources returned -- answer cautiously from general knowledge and say explicitly that no sources matched)';\n\nconst systemPrompt = `You are a marketing research assistant for a working professional.\\n\\nAnswer the user's question using ONLY the numbered sources provided. Rules:\\n\\n1. Cite each non-obvious claim inline as [N] where N is the source number. Do not fabricate citations.\\n2. Sources span 5 kinds: public web articles, YouTube videos, Reddit threads, the user's own Google Drive docs, and the user's NiftyPM tasks/projects. When citing Drive or Nifty content, treat it as the user's internal context, not public knowledge.\\n3. If the sources don't actually cover the question, say so plainly in one sentence -- don't invent.\\n4. Prefer recent, practitioner-tested advice over generic theory.\\n5. Format: 1-2 sentence summary opening, then bulleted detail. Use markdown. Tight, no throat-clearing, no \"As an AI...\".\\n6. End with a one-line \"Worth a manual check:\" pointer to the Google SEO Mastermind FB group ONLY when the question is community/anecdotal (e.g. \"is X risky?\", \"what are people seeing with Y?\").`;\n\nconst userPrompt = `<question>\\n${message}\\n</question>\\n\\n<sources>\\n${sourcesBlock}\\n</sources>\\n\\nAnswer now.`;\n\nconst messages = [{ role: 'system', content: systemPrompt }];\nfor (const turn of history) {\n  if (turn && turn.role && turn.content) {\n    messages.push({ role: turn.role, content: String(turn.content).slice(0, 4000) });\n  }\n}\nmessages.push({ role: 'user', content: userPrompt });\n\nreturn [{\n  json: {\n    openrouter_request: {\n      model: MODEL,\n      messages,\n      temperature: 0.4\n    },\n    openrouter_api_key: OPENROUTER_API_KEY,\n    model: MODEL,\n    sources_for_citations: hits\n  }\n}];"
+      },
+      "id": "chat-build-prompt",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.openrouter_api_key }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "HTTP-Referer", "value": "https://shettymarketing.com" },
+            { "name": "X-Title", "value": "Marketing Insights Chat (n8n)" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openrouter_request) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "chat-openrouter",
+      "name": "OpenRouter (Chat)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 0],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Parse the OpenRouter response into the shape the frontend expects.\n\nconst raw  = $input.first().json || {};\nconst prev = $('Build Prompt').first().json;\n\nif (prev.__passthrough_error) {\n  return [{ json: prev.__passthrough_error }];\n}\n\nconst hasFull   = Object.prototype.hasOwnProperty.call(raw, 'statusCode');\nconst statusCode = hasFull ? raw.statusCode : 200;\nconst body       = hasFull ? raw.body : raw;\n\nif (statusCode >= 400) {\n  const detail = (body && typeof body === 'object')\n    ? (body.error && body.error.message) || body.message || JSON.stringify(body).slice(0, 400)\n    : String(body || '').slice(0, 400);\n  return [{\n    json: {\n      error: 'OpenRouter HTTP ' + statusCode,\n      detail,\n      hint: 'Check OPENROUTER_API_KEY in the Build Prompt node, and that the model id (\"' + (prev.model || '?') + '\") is valid on OpenRouter.'\n    }\n  }];\n}\n\nif (body && body.error) {\n  const detail = (body.error.message) || JSON.stringify(body.error).slice(0, 400);\n  return [{ json: { error: 'OpenRouter returned error', detail } }];\n}\n\nconst answer = (body && body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content) || '';\nif (!answer) {\n  return [{\n    json: {\n      error: 'Empty answer from OpenRouter',\n      detail: JSON.stringify(body || {}).slice(0, 400)\n    }\n  }];\n}\n\nconst citations = (prev.sources_for_citations || []).map(s => ({\n  n: s.n,\n  source: s.source,\n  source_label: s.source_label,\n  url: s.url,\n  title: s.title,\n  snippet: s.snippet || ''\n}));\n\n// Group citations by section kind so the frontend can render the 4 source\n// sections (Reddit / YouTube / Nifty / Drive). Blogs go into the chat answer\n// only (they're the LLM's primary source for the answer text).\nfunction kindOf(c) {\n  if (c.source === 'drive') return 'drive';\n  if (c.source === 'nifty') return 'nifty';\n  const u = (c.url || '').toLowerCase();\n  if (u.indexOf('reddit.com') !== -1) return 'reddit';\n  if (u.indexOf('youtube.com') !== -1 || u.indexOf('youtu.be') !== -1) return 'youtube';\n  return 'blogs';\n}\n\nconst grouped_by_kind = { reddit: [], youtube: [], blogs: [], nifty: [], drive: [] };\nfor (const c of citations) {\n  const k = kindOf(c);\n  if (grouped_by_kind[k]) grouped_by_kind[k].push(c);\n}\n\nreturn [{\n  json: {\n    answer,\n    citations,\n    grouped_by_kind,\n    model: prev.model,\n    usage: (body && body.usage) || null,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "chat-parse",
+      "name": "Parse Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "chat-respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1980, 0]
+    }
+  ],
+  "connections": {
+    "Chat Webhook": {
+      "main": [[{ "node": "Is Chat Test?", "type": "main", "index": 0 }]]
+    },
+    "Is Chat Test?": {
+      "main": [
+        [{ "node": "Respond Chat Test OK", "type": "main", "index": 0 }],
+        [{ "node": "Normalize Inputs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Inputs": {
+      "main": [[{ "node": "Multi-Source Search", "type": "main", "index": 0 }]]
+    },
+    "Multi-Source Search": {
+      "main": [[{ "node": "Drive Vector Search", "type": "main", "index": 0 }]]
+    },
+    "Drive Vector Search": {
+      "main": [[{ "node": "Merge Drive Hits", "type": "main", "index": 0 }]]
+    },
+    "Merge Drive Hits": {
+      "main": [[{ "node": "Nifty Tasks Search", "type": "main", "index": 0 }]]
+    },
+    "Nifty Tasks Search": {
+      "main": [[{ "node": "Nifty Messages Search", "type": "main", "index": 0 }]]
+    },
+    "Nifty Messages Search": {
+      "main": [[{ "node": "Merge Nifty Hits", "type": "main", "index": 0 }]]
+    },
+    "Merge Nifty Hits": {
+      "main": [[{ "node": "Build Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build Prompt": {
+      "main": [[{ "node": "OpenRouter (Chat)", "type": "main", "index": 0 }]]
+    },
+    "OpenRouter (Chat)": {
+      "main": [[{ "node": "Parse Response", "type": "main", "index": 0 }]]
+    },
+    "Parse Response": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Link Edit Test</title>
+<style>
+  body { font-family: system-ui; padding: 20px; }
+  .editor { border: 2px solid #ccc; padding: 16px; min-height: 200px; font-size: 14px; line-height: 1.7; outline: none; }
+  .editor:focus { border-color: #6366f1; }
+  .editor h2 { font-size: 18px; font-weight: 700; margin: 16px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  .bd-url { color: #2563eb; text-decoration: underline; cursor: pointer; }
+  .bd-url:hover { color: #1d4ed8; }
+  .result { margin-top: 16px; padding: 12px; background: #f3f4f6; border-radius: 6px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+  .test-label { font-weight: 600; margin: 16px 0 4px; color: #374151; }
+  .instructions { background: #fef3c7; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; }
+  .editor2 { border: 2px solid #ccc; padding: 16px; min-height: 200px; font-size: 14px; line-height: 1.7; outline: none; }
+  .editor2:focus { border-color: #6366f1; }
+  .editor2 h2 { font-size: 18px; font-weight: 700; margin: 16px 0 8px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+  .bd-url2 { color: #2563eb; text-decoration: underline; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h1>Brain Dump Link Edit Test</h1>
+
+<div class="instructions">
+  <strong>Test these:</strong>
+  <ol>
+    <li>Click after a link, press Backspace — should delete the link span</li>
+    <li>Click after a link, press Enter — should create new line after the link</li>
+    <li>Click before a link, press Backspace — should delete the char before the link</li>
+    <li>Type new text near links — should work normally</li>
+  </ol>
+</div>
+
+<div class="test-label">Test Editor A (span contenteditable="false"):</div>
+<div class="editor" contenteditable="true" id="editor1"></div>
+
+<div class="test-label">Test Editor B (span WITHOUT contenteditable="false"):</div>
+<div class="editor2" contenteditable="true" id="editor2"></div>
+
+<div class="test-label">Raw HTML output A:</div>
+<div class="result" id="output1"></div>
+
+<div class="test-label">Raw HTML output B:</div>
+<div class="result" id="output2"></div>
+
+<div class="test-label">Cursor info:</div>
+<div class="result" id="cursor1"></div>
+
+<script>
+const BD_URL_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
+
+function autoLinkUrls(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  textNodes.forEach(node => {
+    if (node.parentNode.closest('.bd-url, a')) return;
+    const text = node.textContent;
+    if (!BD_URL_RE.test(text)) return;
+    BD_URL_RE.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let last = 0, m;
+    while ((m = BD_URL_RE.exec(text))) {
+      if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const span = document.createElement('span');
+      span.className = 'bd-url';
+      span.setAttribute('contenteditable', 'false');
+      span.textContent = m[0];
+      span.dataset.url = m[0];
+      const zwsp = '\u200B';
+      frag.appendChild(document.createTextNode(zwsp));
+      frag.appendChild(span);
+      frag.appendChild(document.createTextNode(zwsp));
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    node.parentNode.replaceChild(frag, node);
+  });
+}
+
+// Init editor 1 (with contenteditable="false")
+const editor1 = document.getElementById('editor1');
+const testHTML = `<h2>Test Section</h2>
+<p>Check this link: https://example.com/test1</p>
+<p>Another link: https://google.com/search?q=test and some text after</p>
+<p>Multiple links: https://site1.com and https://site2.com/path</p>
+<p>No links here, just plain text.</p>`;
+
+editor1.innerHTML = testHTML;
+autoLinkUrls(editor1);
+
+// Click handler for Editor 1
+editor1.addEventListener('click', (e) => {
+  const span = e.target.closest('.bd-url');
+  if (span && window.getSelection().type !== 'Range') {
+    console.log('Editor1 would open:', span.dataset.url);
+    e.preventDefault();
+  }
+});
+
+// Update output display
+function updateOutput() {
+  document.getElementById('output1').textContent = editor1.innerHTML;
+  const sel = window.getSelection();
+  if (sel.rangeCount && (editor1.contains(sel.anchorNode) || document.getElementById('editor2').contains(sel.anchorNode))) {
+    document.getElementById('cursor1').textContent = 
+      `anchorNode: ${sel.anchorNode.nodeType === 3 ? JSON.stringify(sel.anchorNode.textContent.substring(0,60)) : sel.anchorNode.tagName}\n` +
+      `anchorOffset: ${sel.anchorOffset}\n` +
+      `focusNode: ${sel.focusNode.nodeType === 3 ? JSON.stringify(sel.focusNode.textContent.substring(0,60)) : sel.focusNode.tagName}\n` +
+      `focusOffset: ${sel.focusOffset}\n` +
+      `type: ${sel.type}`;
+  }
+}
+
+editor1.addEventListener('input', updateOutput);
+editor1.addEventListener('keyup', updateOutput);
+editor1.addEventListener('click', () => setTimeout(updateOutput, 10));
+
+// Init editor 2 (WITHOUT contenteditable="false")
+const editor2 = document.getElementById('editor2');
+
+function autoLinkUrls2(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  textNodes.forEach(node => {
+    if (node.parentNode.closest('.bd-url2, .bd-url, a')) return;
+    const text = node.textContent;
+    if (!BD_URL_RE.test(text)) return;
+    BD_URL_RE.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let last = 0, m;
+    while ((m = BD_URL_RE.exec(text))) {
+      if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      const span = document.createElement('span');
+      span.className = 'bd-url2';
+      span.setAttribute('contenteditable', 'false');
+      span.textContent = m[0];
+      span.dataset.url = m[0];
+      const zwsp = '\u200B';
+      frag.appendChild(document.createTextNode(zwsp));
+      frag.appendChild(span);
+      frag.appendChild(document.createTextNode(zwsp));
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    node.parentNode.replaceChild(frag, node);
+  });
+}
+
+editor2.innerHTML = testHTML;
+autoLinkUrls2(editor2);
+
+// Click handler for Editor 2 - use mousedown to track start position
+let mouseDownPos = null;
+editor2.addEventListener('mousedown', (e) => {
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+});
+editor2.addEventListener('click', (e) => {
+  const span = e.target.closest('.bd-url2');
+  if (!span) return;
+  // Only open if it's a clean click (not drag for selection)
+  if (window.getSelection().type === 'Range') return;
+  // Check if it's a real click vs drag
+  if (mouseDownPos && (Math.abs(e.clientX - mouseDownPos.x) > 3 || Math.abs(e.clientY - mouseDownPos.y) > 3)) return;
+  console.log('Editor2 would open:', span.dataset.url);
+  e.preventDefault();
+});
+
+editor2.addEventListener('input', updateOutput);
+editor2.addEventListener('keyup', updateOutput);
+editor2.addEventListener('click', () => setTimeout(updateOutput, 10));
+
+document.addEventListener('selectionchange', () => {
+  if (document.activeElement === editor1 || document.activeElement === editor2) updateOutput();
+});
+
+updateOutput();
+</script>
+
+</body>
+</html>

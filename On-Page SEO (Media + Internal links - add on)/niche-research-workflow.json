@@ -1,0 +1,419 @@
+{
+  "name": "Niche Research",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Niche Research\n\n**Mirrors:** `webhook-service/handlers/niche-research.js`\n\n**Flow:**\n1. Webhook accepts `{ niche, language?, location?, filters?, seed_keywords?, max_keywords?, serp_depth?, max_domains? }`.\n2. Normalize + decide: expand niche via DataForSEO keyword_suggestions OR use user-provided seeds.\n3. Fan-out: SERP per keyword (DataForSEO organic).\n4. Extract domains from each SERP, dedupe, drop blocklist (YouTube, Wikipedia, Amazon, etc.).\n5. Fan-out: DataForSEO domain_rank_overview per unique domain (DR + traffic).\n6. Pre-filter on DA + Traffic (cheaper than burning Firecrawl on losers).\n7. Fan-out: Firecrawl scrape (full page, ads on) per surviving domain.\n8. Detect signals on each page: adsense, mediavine, ezoic, amazon, affiliate, shop, shopify, wordpress.\n9. Apply monetization filter, score Perf = traffic / (DA+1), sort, respond.\n\n**Before running:**\n- Activate workflow, copy Production URL into `on-page-app.html` → Niche Research → Webhook URL.\n- DataForSEO HTTP nodes: wire to your HTTP Basic Auth credential (login + password).\n- Firecrawl API key is inlined as the Authorization header — rotate in the Firecrawl console when needed.\n\n**Output shape (consumed by the UI table):**\n```\n{\n  request, total_weak_websites, generated_at,\n  diagnostics: { keywords_used, raw_domains_seen, after_pre_filter, after_signal_filter, elapsed_ms },\n  keywords: [...],\n  domains: [{ domain, url, signals[], main_topic, niche, perf, da, global_traffic, ranking_keywords_in_niche, top_niche_keywords[] }, ...]\n}\n```\n\n**Cost / latency:** ~30 keyword SERPs + ~100 domain enrichments + ~40 Firecrawl scrapes. 30–90s end-to-end. ~$0.30–$1.00 per niche.",
+        "height": 600,
+        "width": 420
+      },
+      "id": "nr-readme-001",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "content": "## Fan-out stages\n\n**Stage 1: SERPs.** `Build Keyword List` emits N keyword items. n8n auto-parallelizes the HTTP fan-out into `DataForSEO SERP`.\n\n**Stage 2: Domain Enrichment.** `Aggregate & Dedupe Domains` collects every per-SERP extraction via `$input.all()`, dedupes against the blocklist, then re-fans-out one item per unique domain. n8n parallelizes the `Domain Rank Overview` HTTP calls.\n\n**Stage 3: Firecrawl.** `Pre-Filter Domains` drops DR-too-high / traffic-too-low rows BEFORE we pay for Firecrawl, slices to `max_domains`, then fans out again. `Firecrawl Scrape` parallelizes.\n\n**Resilience:** All HTTP fan-out nodes use `onError: continueRegularOutput` + `neverError: true`. A single failed domain enrichment or Firecrawl scrape becomes `{ _error: ... }` on its row, but the rest of the pipeline still ships.",
+        "height": 400,
+        "width": 420,
+        "color": 5
+      },
+      "id": "nr-architecture-note",
+      "name": "Fan-out Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1500, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "niche-research",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "nr-webhook-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [460, 480],
+      "webhookId": "niche-research-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "nr-is-test-cond",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "nr-is-test-001",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [640, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Niche Research webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "nr-respond-test-001",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [840, 608]
+    },
+    {
+      "parameters": {
+        "jsCode": "const LANGUAGES = ['en', 'fr', 'de'];\nfunction clampInt(v, lo, hi, def) {\n  const n = Number(v);\n  if (!Number.isFinite(n)) return def;\n  return Math.max(lo, Math.min(hi, Math.round(n)));\n}\n\nconst input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\nconst filters = body.filters && typeof body.filters === 'object' ? body.filters : {};\n\nconst niche = String(body.niche || '').trim();\nconst language = LANGUAGES.includes(body.language) ? body.language : 'en';\nconst location = String(body.location || 'United States').trim();\nconst seed = Array.isArray(body.seed_keywords)\n  ? body.seed_keywords.map(k => String(k).trim().toLowerCase()).filter(Boolean).slice(0, 60)\n  : [];\nconst monetization = Array.isArray(filters.monetization) ? filters.monetization.map(String) : [];\nconst ad_networks = Array.isArray(filters.ad_networks) ? filters.ad_networks.map(String) : [];\n\nif (!niche && !seed.length) throw new Error('niche or seed_keywords is required');\n\nconst inputs = {\n  niche, language, location,\n  filters: {\n    da_max: clampInt(filters.da_max, 0, 100, 25),\n    traffic_min: Math.max(0, Number(filters.traffic_min) || 1000),\n    monetization,\n    ad_networks\n  },\n  seed_keywords: seed,\n  max_keywords: clampInt(body.max_keywords, 5, 60, 30),\n  serp_depth: clampInt(body.serp_depth, 10, 30, 20),\n  max_domains: clampInt(body.max_domains, 5, 80, 40),\n  started_at: Date.now(),\n  requested_at: body.requested_at || new Date().toISOString()\n};\n\nreturn [{ json: { inputs, has_seeds: seed.length > 0 } }];"
+      },
+      "id": "nr-normalize-001",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 368]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "nr-has-seeds-cond",
+              "leftValue": "={{ $json.inputs.seed_keywords.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "nr-has-seeds-001",
+      "name": "Has Seeds?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1040, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $json.inputs;\nconst seeds = inputs.seed_keywords.slice(0, inputs.max_keywords);\nreturn seeds.map(kw => ({ json: { inputs, keyword: kw, search_volume: null, source: 'user' } }));"
+      },
+      "id": "nr-build-from-seeds-001",
+      "name": "Build From Seeds",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1240, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/keyword_suggestions/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA==" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify([{ keyword: $json.inputs.niche, location_name: $json.inputs.location, language_code: $json.inputs.language, limit: $json.inputs.max_keywords * 2, include_seed_keyword: true, filters: [['keyword_info.search_volume', '>', 100]], order_by: ['keyword_info.search_volume,desc'] }]) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "nr-kw-suggestions-001",
+      "name": "DataForSEO Keyword Suggestions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1240, 456],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $('Normalize Input').first().json.inputs;\nconst resp = $input.first().json;\nconst items = (resp && resp.tasks && resp.tasks[0] && resp.tasks[0].result && resp.tasks[0].result[0] && resp.tasks[0].result[0].items) || [];\n\nconst kws = items\n  .map(i => ({\n    keyword: String(i.keyword || '').trim().toLowerCase(),\n    search_volume: i.keyword_info && i.keyword_info.search_volume,\n    cpc: i.keyword_info && i.keyword_info.cpc,\n    kd: i.keyword_properties && i.keyword_properties.keyword_difficulty\n  }))\n  .filter(k => k.keyword)\n  .slice(0, inputs.max_keywords);\n\n// Fallback: if expansion returned nothing usable, run with just the raw niche term.\nconst use = kws.length ? kws : [{ keyword: inputs.niche, search_volume: null }];\n\nreturn use.map(k => ({ json: { inputs, keyword: k.keyword, search_volume: k.search_volume, source: 'expanded' } }));"
+      },
+      "id": "nr-parse-keywords-001",
+      "name": "Parse Keywords",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 456]
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "nr-merge-keywords-001",
+      "name": "Merge Keyword Sources",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [1660, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/serp/google/organic/live/advanced",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA==" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify([{ keyword: $json.keyword, location_name: $json.inputs.location, language_code: $json.inputs.language, device: 'desktop', depth: $json.inputs.serp_depth }]) }}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "nr-serp-001",
+      "name": "DataForSEO SERP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1860, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const upstreamItems = $('Merge Keyword Sources').all();\nconst myIdx = $itemIndex;\nconst upstream = upstreamItems[myIdx] ? upstreamItems[myIdx].json : { keyword: '', search_volume: null };\nconst keyword = upstream.keyword || '';\nconst search_volume = upstream.search_volume || null;\n\nconst resp = $input.item.json || {};\nconst items = (resp && resp.tasks && resp.tasks[0] && resp.tasks[0].result && resp.tasks[0].result[0] && resp.tasks[0].result[0].items) || [];\n\nconst domains = items\n  .filter(i => i.type === 'organic')\n  .map(i => ({\n    keyword,\n    search_volume,\n    domain: String(i.domain || '').replace(/^www\\./, '').toLowerCase(),\n    position: i.rank_absolute,\n    url: i.url\n  }))\n  .filter(d => d.domain);\n\nreturn { json: { keyword, domains, count: domains.length } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "nr-extract-domains-001",
+      "name": "Extract Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2060, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const BLOCK = new Set([\n  'youtube.com','facebook.com','instagram.com','twitter.com','x.com',\n  'tiktok.com','pinterest.com','reddit.com','quora.com','medium.com',\n  'linkedin.com','wikipedia.org','amazon.com','amazon.co.uk','amazon.ca',\n  'amazon.in','amazon.de','amazon.fr',\n  'ebay.com','etsy.com','walmart.com','target.com','homedepot.com',\n  'lowes.com','wayfair.com','ikea.com','apple.com','microsoft.com',\n  'google.com','yahoo.com','bing.com','forbes.com','nytimes.com',\n  'washingtonpost.com','cnn.com','bbc.com','theguardian.com','huffpost.com',\n  'businessinsider.com','buzzfeed.com','vox.com','thespruce.com',\n  'thespruceeats.com','hgtv.com','bobvila.com','familyhandyman.com',\n  'goodhousekeeping.com','housebeautiful.com','architecturaldigest.com',\n  'elledecor.com','realsimple.com','bhg.com','countryliving.com',\n  'marthastewart.com','thisoldhouse.com'\n]);\n\nconst inputs = $('Normalize Input').first().json.inputs;\nconst all = $input.all();\nconst rawDomainCount = all.reduce((s, it) => s + ((it.json && it.json.count) || 0), 0);\n\nconst map = new Map();\nfor (const it of all) {\n  const arr = (it.json && it.json.domains) || [];\n  for (const d of arr) {\n    if (BLOCK.has(d.domain)) continue;\n    if (!map.has(d.domain)) map.set(d.domain, { domain: d.domain, niche_keywords: [] });\n    map.get(d.domain).niche_keywords.push({\n      keyword: d.keyword, position: d.position, url: d.url, search_volume: d.search_volume\n    });\n  }\n}\n\nconst out = [...map.values()];\nreturn out.map(d => ({ json: { inputs, domain: d.domain, niche_keywords: d.niche_keywords, raw_domain_count: rawDomainCount, unique_domain_count: out.length } }));"
+      },
+      "id": "nr-dedupe-domains-001",
+      "name": "Aggregate & Dedupe Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2260, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/domain_rank_overview/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA==" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify([{ target: $json.domain, location_name: $json.inputs.location, language_code: $json.inputs.language }]) }}",
+        "options": {
+          "timeout": 45000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "nr-domain-rank-001",
+      "name": "Domain Rank Overview",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2460, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $('Normalize Input').first().json.inputs;\nconst upstream = $('Aggregate & Dedupe Domains').all();\nconst enrich = $input.all();\n\n// Zip upstream domain context with Domain Rank Overview response (traffic + keyword count).\n// Note: domain_rank_overview's traffic/count live at result.items[0].metrics.organic\n// (NOT result.metrics — that's an empty branch). The endpoint does NOT return a\n// domain rank score — we fetch that separately from backlinks/bulk_ranks below.\nconst rows = upstream.map((u, i) => {\n  const ctx = u.json || {};\n  const resp = (enrich[i] && enrich[i].json) || {};\n  const result = resp && resp.tasks && resp.tasks[0] && resp.tasks[0].result && resp.tasks[0].result[0];\n  const item = result && result.items && result.items[0];\n  const metrics = (item && item.metrics) || {};\n  const organic = metrics.organic || {};\n  return {\n    domain: ctx.domain,\n    niche_keywords: ctx.niche_keywords || [],\n    da: null,\n    global_traffic: Math.round(Number(organic.etv || 0)),\n    ranking_keywords_total: Number(organic.count || 0)\n  };\n});\n\n// Bulk-fetch Domain Rank for every domain in one backlinks API call.\n// DataForSEO returns rank 0-1000 — normalize to 0-100 for DA-equivalence.\nconst targets = rows.map(r => r.domain).filter(Boolean);\nlet drError = null;\nif (targets.length) {\n  try {\n    const drResp = await this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.dataforseo.com/v3/backlinks/bulk_ranks/live',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': 'Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=='\n      },\n      body: [{ targets }],\n      json: true,\n      timeout: 60000\n    });\n    const drItems = (drResp && drResp.tasks && drResp.tasks[0] && drResp.tasks[0].result && drResp.tasks[0].result[0] && drResp.tasks[0].result[0].items) || [];\n    const drMap = new Map(drItems.map(i => [String(i.target || '').replace(/^www\\./, '').toLowerCase(), i.rank]));\n    for (const r of rows) {\n      const rk = drMap.get(r.domain);\n      r.da = typeof rk === 'number' ? Math.round(rk / 10) : null;\n    }\n  } catch (e) { drError = String((e && e.message) || e); }\n}\n\nfunction scorePerf(traffic, da) {\n  if (!traffic || traffic < 1) return 0;\n  const safeDa = typeof da === 'number' ? da : 50;\n  return Math.round(traffic / (safeDa + 1));\n}\n\nconst pre = rows\n  .filter(r => (r.da == null || r.da <= inputs.filters.da_max))\n  .filter(r => r.global_traffic >= inputs.filters.traffic_min)\n  .sort((a, b) => scorePerf(b.global_traffic, b.da) - scorePerf(a.global_traffic, a.da))\n  .slice(0, inputs.max_domains);\n\nif (!pre.length) {\n  return [{ json: { inputs, _empty: true, pre_filtered_count: 0, raw_rows: rows.length, dr_error: drError } }];\n}\n\nreturn pre.map(r => ({\n  json: {\n    inputs,\n    domain: r.domain,\n    niche_keywords: r.niche_keywords,\n    da: r.da,\n    global_traffic: r.global_traffic,\n    ranking_keywords_total: r.ranking_keywords_total,\n    pre_filtered_count: pre.length,\n    raw_rows: rows.length\n  }\n}));"
+      },
+      "id": "nr-pre-filter-001",
+      "name": "Pre-Filter Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2660, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "Bearer fc-79ed532c5804415d8503b3edd18750e0" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: 'https://' + $json.domain, formats: ['markdown', 'html', 'links'], onlyMainContent: false, blockAds: false, waitFor: 1200 }) }}",
+        "options": {
+          "timeout": 45000,
+          "response": { "response": { "neverError": true, "responseFormat": "json" } }
+        }
+      },
+      "id": "nr-firecrawl-001",
+      "name": "Firecrawl Scrape",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2860, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Pre-Filter Domains').all()[$itemIndex];\nconst meta = (ctx && ctx.json) || {};\n\n// Sentinel pass-through: pre-filter found nothing, just propagate empty.\nif (meta._empty) return { json: meta };\n\nconst resp = $input.item.json || {};\nconst data = (resp && resp.data) || {};\nconst html = String(data.html || '');\nconst md = String(data.markdown || '');\nconst content = html || md;\n\nconst RULES = [\n  ['adsense',    /pagead2\\.googlesyndication\\.com|data-ad-client=[\"']ca-pub-|adsbygoogle\\.js/i],\n  ['mediavine',  /scripts\\.mediavine\\.com|mediavine-/i],\n  ['ezoic',      /ezoic\\.(com|net)|ezoic\\.js|ezojs\\.com|ezoic-id/i],\n  ['amazon',     /amzn\\.to|amazon\\.[a-z.]{2,6}\\/[^\"'<>\\s]*[?&]tag=|associates-amazon|as\\.li\\//i],\n  ['affiliate',  /as an amazon associate|affiliate (link|disclosure)|affiliate-disclos|\"affiliate\"|impact\\.com|clickbank|cj\\.com|shareasale|awin\\.com|partnerstack|rakutenadvertising/i],\n  ['shop',       /woocommerce|shopify|\\/shop\\/|\\/store\\/|add to cart|\\.add-to-cart|product-add-to-cart/i],\n  ['wordpress',  /wp-content|wp-includes|wp-json|generator[\"'\\s]+content=[\"']WordPress/i],\n  ['shopify',    /cdn\\.shopify\\.com|shopify\\.com\\/s\\//i]\n];\nconst signals = [];\nfor (const [tag, re] of RULES) if (re.test(content)) signals.push(tag);\n\nconst hasFcError = resp && (resp.success === false || resp.error);\nconst scrape_source = hasFcError ? 'fallback' : 'firecrawl';\nconst scrape_error = hasFcError ? (resp.error || resp.message || 'firecrawl error') : null;\n\nreturn { json: {\n  inputs: meta.inputs,\n  domain: meta.domain,\n  niche_keywords: meta.niche_keywords,\n  da: meta.da,\n  global_traffic: meta.global_traffic,\n  ranking_keywords_total: meta.ranking_keywords_total,\n  pre_filtered_count: meta.pre_filtered_count,\n  raw_rows: meta.raw_rows,\n  signals,\n  scrape_source,\n  scrape_error\n} };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "nr-detect-signals-001",
+      "name": "Detect Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3060, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $('Normalize Input').first().json.inputs;\nconst keywordItems = $('Merge Keyword Sources').all().map(it => ({\n  keyword: (it.json && it.json.keyword) || '',\n  search_volume: it.json && it.json.search_volume,\n  source: (it.json && it.json.source) || 'expanded'\n}));\n\nconst rows = $input.all().map(it => it.json).filter(r => !r._empty);\nconst rawRows = rows.length ? rows[0].raw_rows : 0;\nconst preFilteredCount = rows.length ? rows[0].pre_filtered_count : 0;\n\n// Debug snapshot — surface what the SERP HTTP node actually returned, so we can\n// tell whether the empty pipeline is an auth issue, response-shape mismatch,\n// or blocklist eating everything. Remove once stable.\nlet _debug = null;\nif (rawRows === 0) {\n  let serpAll = [];\n  try { serpAll = $('DataForSEO SERP').all(); } catch (e) {}\n  const first = serpAll[0] && serpAll[0].json;\n  const result0 = first && first.tasks && first.tasks[0] && first.tasks[0].result && first.tasks[0].result[0];\n  const items0 = (result0 && result0.items) || [];\n  let extracted = [];\n  try { extracted = $('Extract Domains').all(); } catch (e) {}\n  const extractTotalDomains = extracted.reduce((s, it) => s + (((it.json && it.json.count) || 0)), 0);\n  let agg = [];\n  try { agg = $('Aggregate & Dedupe Domains').all(); } catch (e) {}\n  let drank = [];\n  try { drank = $('Domain Rank Overview').all(); } catch (e) {}\n  let prefilt = [];\n  try { prefilt = $('Pre-Filter Domains').all(); } catch (e) {}\n  _debug = {\n    serp_response_count: serpAll.length,\n    first_serp_status_code: first && first.status_code,\n    first_serp_items_count: items0.length,\n    first_serp_organic_sample: items0.filter(i => i.type === 'organic').slice(0, 3).map(i => ({ domain: i.domain, rank: i.rank_absolute, url: i.url })),\n    extract_domains_count: extracted.length,\n    extract_first_count: extracted[0] && extracted[0].json && extracted[0].json.count,\n    extract_total_domains_across_all: extractTotalDomains,\n    aggregate_output_count: agg.length,\n    aggregate_first_keys: agg[0] && agg[0].json ? Object.keys(agg[0].json) : null,\n    aggregate_first_domain: agg[0] && agg[0].json && agg[0].json.domain,\n    aggregate_first_raw_domain_count: agg[0] && agg[0].json && agg[0].json.raw_domain_count,\n    aggregate_first_unique_domain_count: agg[0] && agg[0].json && agg[0].json.unique_domain_count,\n    aggregate_sample_domains: agg.slice(0, 8).map(it => it.json && it.json.domain),\n    domain_rank_output_count: drank.length,\n    domain_rank_first_status: drank[0] && drank[0].json && drank[0].json.status_code,\n    domain_rank_first_keys: drank[0] && drank[0].json ? Object.keys(drank[0].json).slice(0, 10) : null,\n    prefilter_output_count: prefilt.length,\n    prefilter_first_keys: prefilt[0] && prefilt[0].json ? Object.keys(prefilt[0].json) : null,\n    prefilter_first_empty: prefilt[0] && prefilt[0].json && prefilt[0].json._empty,\n    prefilter_first_da: prefilt[0] && prefilt[0].json && prefilt[0].json.da,\n    prefilter_first_traffic: prefilt[0] && prefilt[0].json && prefilt[0].json.global_traffic\n  };\n}\n\nfunction scorePerf(traffic, da) {\n  if (!traffic || traffic < 1) return 0;\n  const safeDa = typeof da === 'number' ? da : 50;\n  return Math.round(traffic / (safeDa + 1));\n}\n\nconst monSel = inputs.filters.monetization || [];\nconst adSel = inputs.filters.ad_networks || [];\nfunction passesMonetization(sigs) {\n  if (!monSel.length) return true;\n  const hasAds = sigs.includes('adsense') || sigs.includes('mediavine') || sigs.includes('ezoic');\n  const hasEcom = sigs.includes('shop') || sigs.includes('shopify');\n  const hasAff = sigs.includes('amazon') || sigs.includes('affiliate');\n  for (const m of monSel) {\n    if (m === 'monetized_with_ads' && hasAds) return true;\n    if (m === 'not_monetized_with_ads' && !hasAds) return true;\n    if (m === 'ecommerce' && hasEcom) return true;\n    if (m === 'not_ecommerce' && !hasEcom) return true;\n    if (m === 'affiliate' && hasAff) return true;\n    if (m === 'no_monetization' && !hasAds && !hasEcom && !hasAff) return true;\n  }\n  return false;\n}\nfunction passesAdNetwork(sigs) {\n  if (!adSel.length) return true;\n  const present = sigs.filter(s => s === 'adsense' || s === 'mediavine' || s === 'ezoic');\n  return adSel.some(a => present.includes(a));\n}\n\nconst final = rows\n  .filter(r => passesMonetization(r.signals || []))\n  .filter(r => passesAdNetwork(r.signals || []))\n  .map(r => ({\n    domain: r.domain,\n    url: 'https://' + r.domain,\n    signals: r.signals || [],\n    main_topic: inputs.niche,\n    niche: inputs.niche,\n    perf: scorePerf(r.global_traffic, r.da),\n    da: r.da,\n    global_traffic: r.global_traffic,\n    us_traffic: null,\n    pages_count: null,\n    ranking_keywords_total: r.ranking_keywords_total,\n    ranking_keywords_in_niche: (r.niche_keywords || []).length,\n    top_niche_keywords: (r.niche_keywords || [])\n      .slice()\n      .sort((a, b) => (a.position || 999) - (b.position || 999))\n      .slice(0, 8),\n    scrape_source: r.scrape_source,\n    scrape_error: r.scrape_error\n  }))\n  .sort((a, b) => b.perf - a.perf);\n\nreturn [{ json: {\n  request: inputs,\n  total_weak_websites: final.length,\n  domains: final,\n  diagnostics: {\n    keywords_used: keywordItems.length,\n    raw_domains_seen: rawRows,\n    after_pre_filter: preFilteredCount,\n    after_signal_filter: final.length,\n    elapsed_ms: Date.now() - inputs.started_at,\n    _debug\n  },\n  keywords: keywordItems,\n  generated_at: new Date().toISOString()\n} }];"
+      },
+      "id": "nr-final-aggregate-001",
+      "name": "Final Aggregate + Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3260, 368]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "nr-respond-001",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [3460, 368]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [ { "node": "Is Test?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Is Test?": {
+      "main": [
+        [ { "node": "Respond Test OK", "type": "main", "index": 0 } ],
+        [ { "node": "Normalize Input", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [ { "node": "Has Seeds?", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Has Seeds?": {
+      "main": [
+        [ { "node": "Build From Seeds", "type": "main", "index": 0 } ],
+        [ { "node": "DataForSEO Keyword Suggestions", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Build From Seeds": {
+      "main": [
+        [ { "node": "Merge Keyword Sources", "type": "main", "index": 0 } ]
+      ]
+    },
+    "DataForSEO Keyword Suggestions": {
+      "main": [
+        [ { "node": "Parse Keywords", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Parse Keywords": {
+      "main": [
+        [ { "node": "Merge Keyword Sources", "type": "main", "index": 1 } ]
+      ]
+    },
+    "Merge Keyword Sources": {
+      "main": [
+        [ { "node": "DataForSEO SERP", "type": "main", "index": 0 } ]
+      ]
+    },
+    "DataForSEO SERP": {
+      "main": [
+        [ { "node": "Extract Domains", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Extract Domains": {
+      "main": [
+        [ { "node": "Aggregate & Dedupe Domains", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Aggregate & Dedupe Domains": {
+      "main": [
+        [ { "node": "Domain Rank Overview", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Domain Rank Overview": {
+      "main": [
+        [ { "node": "Pre-Filter Domains", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Pre-Filter Domains": {
+      "main": [
+        [ { "node": "Firecrawl Scrape", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Firecrawl Scrape": {
+      "main": [
+        [ { "node": "Detect Signals", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Detect Signals": {
+      "main": [
+        [ { "node": "Final Aggregate + Score", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Final Aggregate + Score": {
+      "main": [
+        [ { "node": "Respond with Results", "type": "main", "index": 0 } ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "nr-v1",
+  "meta": {},
+  "id": "nicheResearch001",
+  "tags": []
+}

@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shetty Marketing — Suite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand-navy: #1f3a68;
+      --brand-navy-2: #2c4f81;
+      --brand-sky: #1fb1f5;
+      --brand-yellow: #ffdc27;
+      --brand-ink: #1c1b1b;
+
+      --navy-50: #eaf1f8;
+      --navy-100: #d6e4f3;
+      --navy-700: #1f3a68;
+      --navy-900: #0e1f3a;
+
+      --sky-50: #f0faff;
+      --sky-100: #d6f0fc;
+      --sky-300: #6dcaf6;
+      --sky-500: #1fb1f5;
+      --sky-700: #0b87c0;
+
+      --yellow-300: #ffe864;
+      --yellow-500: #ffdc27;
+
+      --gray-900: #1c1b1b;
+      --gray-700: #4a4a4a;
+      --gray-500: #7d7d7d;
+      --gray-400: #a8a8a8;
+      --gray-300: #d4d4d4;
+      --gray-200: #e6e6e6;
+      --gray-100: #f1f1ef;
+      --gray-50: #f8f8f6;
+
+      --font-sans: 'Montserrat', system-ui, -apple-system, sans-serif;
+      --font-mono: 'SF Mono', Menlo, Consolas, monospace;
+
+      --shadow-sm: 0 1px 2px rgba(14,31,58,0.04);
+      --shadow-md: 0 10px 28px -10px rgba(14,31,58,0.14), 0 2px 6px -3px rgba(14,31,58,0.06);
+      --shadow-lg: 0 24px 60px -20px rgba(14,31,58,0.18);
+
+      /* Emil-style custom easings */
+      --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--gray-50);
+      color: var(--brand-ink);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-feature-settings: "tnum" 1;
+    }
+    a { color: inherit; text-decoration: none; }
+
+    /* Ambient backdrop — barely-there brand glow */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 14% 8%, rgba(31,177,245,0.05), transparent 42%),
+        radial-gradient(circle at 92% 18%, rgba(255,220,39,0.04), transparent 38%);
+      z-index: -1;
+    }
+
+    /* Focus — visible only for keyboard users */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid var(--brand-sky);
+      outline-offset: 3px;
+      border-radius: 6px;
+    }
+
+    /* ── Top nav ────────────────────────────────────────── */
+    .topbar {
+      background: var(--brand-navy);
+      padding: 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: inset 0 -1px 0 rgba(255,255,255,0.04), 0 2px 12px rgba(14,31,58,0.18);
+    }
+    .topbar-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      height: 56px;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px 6px 6px;
+      border-radius: 8px;
+      transition: background 180ms var(--ease-out), transform 100ms var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .topbar-brand:hover { background: rgba(255,255,255,0.06); }
+    }
+    .topbar-brand:active { transform: scale(0.97); }
+    .topbar-logo {
+      width: 28px; height: 28px;
+      background: var(--brand-sky);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 12px;
+      color: #fff;
+      letter-spacing: -0.03em;
+    }
+    .topbar-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .topbar-nav {
+      display: flex;
+      gap: 2px;
+    }
+    .topbar-nav a {
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 7px 12px;
+      border-radius: 6px;
+      transition: color 180ms var(--ease-out), background 180ms var(--ease-out), transform 100ms var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .topbar-nav a:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    }
+    .topbar-nav a:active { transform: scale(0.97); }
+
+    /* ── Page wrap ──────────────────────────────────────── */
+    .page-wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 28px 96px;
+      width: 100%;
+      flex: 1;
+    }
+
+    /* ── Hero ───────────────────────────────────────────── */
+    .hero {
+      padding: 88px 0 64px;
+      border-bottom: 1px solid var(--gray-200);
+      margin-bottom: 56px;
+      opacity: 0;
+      transform: translateY(6px);
+      animation: fadeUp 600ms var(--ease-out) 80ms forwards;
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--sky-700);
+      margin-bottom: 24px;
+    }
+    .hero-eyebrow-dot {
+      width: 6px; height: 6px;
+      background: var(--brand-sky);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px var(--sky-100);
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5.2vw, 4.25rem);
+      font-weight: 900;
+      letter-spacing: -0.035em;
+      line-height: 1.02;
+      color: var(--brand-ink);
+      max-width: 17ch;
+    }
+    .hero h1 span { color: var(--brand-sky); }
+    .hero-subline {
+      margin-top: 22px;
+      font-size: 15.5px;
+      color: var(--gray-700);
+      line-height: 1.6;
+      max-width: 54ch;
+      font-weight: 400;
+    }
+
+    /* ── Section head ───────────────────────────────────── */
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 16px;
+    }
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--brand-ink);
+    }
+    .section-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gray-500);
+      letter-spacing: 0.04em;
+      font-weight: 500;
+    }
+    .section-count em {
+      font-style: normal;
+      color: var(--brand-ink);
+      font-weight: 600;
+    }
+
+    /* ── Tool grid ──────────────────────────────────────── */
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+    }
+
+    .tool-card {
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      border-radius: 14px;
+      padding: 22px 22px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition:
+        transform 220ms var(--ease-out),
+        box-shadow 220ms var(--ease-out),
+        border-color 220ms var(--ease-out);
+      opacity: 0;
+      transform: translateY(8px);
+      animation: fadeUp 500ms var(--ease-out) forwards;
+    }
+    .tool-card:nth-child(1) { animation-delay: 200ms; }
+    .tool-card:nth-child(2) { animation-delay: 260ms; }
+    .tool-card:nth-child(3) { animation-delay: 320ms; }
+    .tool-card:nth-child(4) { animation-delay: 380ms; }
+    .tool-card:nth-child(5) { animation-delay: 440ms; }
+    .tool-card:nth-child(6) { animation-delay: 500ms; }
+
+    a.tool-card { cursor: pointer; }
+
+    @media (hover: hover) and (pointer: fine) {
+      a.tool-card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-md);
+        border-color: var(--sky-300);
+      }
+    }
+    a.tool-card:active {
+      transform: scale(0.985);
+      transition-duration: 100ms;
+    }
+
+    /* Accent underline reveals on hover, left-to-right */
+    a.tool-card::after {
+      content: "";
+      position: absolute;
+      left: 22px; right: 22px; bottom: 0;
+      height: 2px;
+      background: var(--brand-sky);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 320ms var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      a.tool-card:hover::after { transform: scaleX(1); }
+    }
+
+    .tool-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .tool-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--gray-500);
+    }
+    .tool-arrow {
+      width: 30px; height: 30px;
+      border-radius: 999px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gray-700);
+      transition:
+        background 220ms var(--ease-out),
+        color 220ms var(--ease-out),
+        transform 220ms var(--ease-out),
+        border-color 220ms var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      a.tool-card:hover .tool-arrow {
+        background: var(--brand-sky);
+        border-color: var(--brand-sky);
+        color: #fff;
+        transform: translateX(3px);
+      }
+    }
+
+    .tool-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+      color: var(--brand-ink);
+    }
+    .tool-desc {
+      color: var(--gray-500);
+      font-size: 13.5px;
+      line-height: 1.55;
+      flex: 1;
+    }
+    .tool-tag {
+      margin-top: 2px;
+      font-size: 10.5px;
+      color: var(--gray-500);
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .tool-card.disabled {
+      background: transparent;
+      border-style: dashed;
+      border-color: var(--gray-300);
+      box-shadow: none;
+    }
+    .tool-card.disabled .tool-num,
+    .tool-card.disabled .tool-title,
+    .tool-card.disabled .tool-desc,
+    .tool-card.disabled .tool-tag {
+      color: var(--gray-400);
+    }
+    .tool-card.disabled .tool-arrow {
+      background: transparent;
+      color: var(--gray-400);
+      border-style: dashed;
+    }
+
+    /* ── Reference (brand kit) ──────────────────────────── */
+    .reference {
+      margin-top: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 22px;
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      border-radius: 14px;
+      box-shadow: var(--shadow-sm);
+      transition:
+        transform 220ms var(--ease-out),
+        border-color 220ms var(--ease-out),
+        box-shadow 220ms var(--ease-out);
+      opacity: 0;
+      animation: fadeUp 500ms var(--ease-out) 460ms forwards;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .reference:hover {
+        border-color: var(--gray-300);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+    }
+    .reference:active {
+      transform: scale(0.99);
+      transition-duration: 100ms;
+    }
+    .reference-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--gray-500);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .reference-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--brand-ink);
+    }
+    .reference-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--brand-navy);
+      padding: 9px 14px;
+      border-radius: 999px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      transition:
+        background 220ms var(--ease-out),
+        color 220ms var(--ease-out),
+        border-color 220ms var(--ease-out);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .reference:hover .reference-cta {
+        background: var(--brand-navy);
+        color: #fff;
+        border-color: var(--brand-navy);
+      }
+    }
+    .reference-cta svg { transition: transform 220ms var(--ease-out); }
+    @media (hover: hover) and (pointer: fine) {
+      .reference:hover .reference-cta svg { transform: translateX(2px); }
+    }
+
+    /* ── Footer ─────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--gray-200);
+      padding: 24px 28px;
+      max-width: 1180px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11.5px;
+      color: var(--gray-500);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    footer .foot-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    footer .foot-logo {
+      width: 16px; height: 16px;
+      background: var(--brand-sky);
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 8.5px;
+      font-weight: 900;
+    }
+    footer .meta {
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+    }
+
+    @keyframes fadeUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ── Mobile ─────────────────────────────────────────── */
+    @media (max-width: 760px) {
+      .topbar { padding: 0 18px; }
+      .topbar-nav { display: none; }
+      .page-wrap { padding: 0 18px 56px; }
+      .hero { padding: 48px 0 40px; margin-bottom: 40px; }
+      .tool-grid { grid-template-columns: 1fr; }
+      .reference {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 14px;
+        margin-top: 48px;
+      }
+      footer { padding: 20px 18px; flex-direction: column; gap: 8px; }
+    }
+
+    /* ── Reduced motion ─────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 100ms !important;
+      }
+      .hero, .tool-card, .reference {
+        opacity: 1 !important;
+        transform: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top nav -->
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-brand" href="https://shettymarketing.com/SEO%20suite/index.html">
+      <div class="topbar-logo">SM</div>
+      <span class="topbar-title">Marketing Suite</span>
+    </a>
+    <nav class="topbar-nav">
+      <a href="https://shettymarketing.com/On_page_SEO/on-page-app.html">On-Page</a>
+      <a href="https://shettymarketing.com/On_page_SEO/keyword-research.html">Keywords</a>
+      <a href="https://shettymarketing.com/Off_page_SEO/dashboard.html">Off-Page</a>
+      <a href="https://shettymarketing.com/Marketing Insights/marketing-insights.html">Insights</a>
+    </nav>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-eyebrow">
+      <span class="hero-eyebrow-dot"></span>
+      Internal Suite
+    </div>
+    <h1>Marketing tools,<br>built <span>in-house.</span></h1>
+    <p class="hero-subline">A working index of the SEO and growth utilities I keep adding to. Each one is self-hosted, single-purpose, and built to replace a tool I got tired of paying for.</p>
+  </header>
+
+  <!-- Tools -->
+  <section>
+    <div class="section-head">
+      <h2 class="section-title">All tools</h2>
+      <span class="section-count"><em>04</em> live · 01 in development</span>
+    </div>
+
+    <div class="tool-grid">
+
+      <a class="tool-card" href="https://shettymarketing.com/SEO%20Suite/On%20page%20SEO/on-page-app.html">
+        <div class="tool-card-top">
+          <span class="tool-num">01 — On-Page</span>
+          <span class="tool-arrow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+          </span>
+        </div>
+        <div class="tool-title">On-Page SEO</div>
+        <div class="tool-desc">Entity presence checker, content briefs, and ranking reports — everything for the on-page side of a campaign.</div>
+        <div class="tool-tag">SEO · On-Page</div>
+      </a>
+
+      <a class="tool-card" href="https://shettymarketing.com/SEO%20Suite/On%20page%20SEO/keyword-research.html">
+        <div class="tool-card-top">
+          <span class="tool-num">02 — Keywords</span>
+          <span class="tool-arrow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+          </span>
+        </div>
+        <div class="tool-title">Keyword Research</div>
+        <div class="tool-desc">Seed keyword expansion with volume, KD, and SERP analysis — find weak-spot opportunities and build content clusters fast.</div>
+        <div class="tool-tag">SEO · Keywords</div>
+      </a>
+
+      <a class="tool-card" href="https://shettymarketing.com/SEO%20Suite/Off%20Page%20SEO/dashboard.html">
+        <div class="tool-card-top">
+          <span class="tool-num">03 — Off-Page</span>
+          <span class="tool-arrow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+          </span>
+        </div>
+        <div class="tool-title">Off-Page SEO</div>
+        <div class="tool-desc">Backlink checker and tracking dashboard for off-page audits, link prospecting, and outreach follow-up.</div>
+        <div class="tool-tag">SEO · Off-Page</div>
+      </a>
+
+      <a class="tool-card" href="https://shettymarketing.com/SEO%20Suite/BJP%20Research/Audience/templates/index.html">
+        <div class="tool-card-top">
+          <span class="tool-num">04 — BJP</span>
+          <span class="tool-arrow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+          </span>
+        </div>
+        <div class="tool-title">BJP Research</div>
+        <div class="tool-desc">Audience research and targeting templates for BJP campaigns.</div>
+        <div class="tool-tag">Research · Audience</div>
+      </a>
+
+      <div class="tool-card disabled">
+        <div class="tool-card-top">
+          <span class="tool-num">06 — Soon</span>
+          <span class="tool-arrow">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="7.5" x2="12" y2="12"/><polyline points="12 12 15.5 13.5"/></svg>
+          </span>
+        </div>
+        <div class="tool-title">More, on the way</div>
+        <div class="tool-desc">Local SEO, technical audits, content optimization, and whatever else gets built next.</div>
+        <div class="tool-tag">In development</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Brand kit reference -->
+  <a class="reference" href="brand-kit.html">
+    <div>
+      <div class="reference-label">Reference</div>
+      <div class="reference-title">Brand kit — palette, type, motion</div>
+    </div>
+    <span class="reference-cta">
+      Open
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></svg>
+    </span>
+  </a>
+
+</div>
+
+<footer>
+  <div class="foot-brand">
+    <span class="foot-logo">SM</span>
+    <span>© 2026 · Shetty Marketing</span>
+  </div>
+  <span class="meta">Local · Private · v0.2</span>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,67 @@
+{
+  "total_monthly_volume": 115840,
+  "unique_audience": 75296,
+  "tam": 105414,
+  "demographic_segments": [],
+  "geo_segments": [],
+  "intent_segments": {
+    "informational": {
+      "volume": 82740,
+      "pct": 71.4
+    },
+    "transactional": {
+      "volume": 33100,
+      "pct": 28.6
+    },
+    "commercial": {
+      "volume": 0,
+      "pct": 0.0
+    },
+    "navigational": {
+      "volume": 0,
+      "pct": 0.0
+    }
+  },
+  "commercial_market": {
+    "audience_size": 0,
+    "avg_cpc": 0.18
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 0,
+    "declining": 0
+  },
+  "competition_level": "LOW",
+  "avg_cpc": 0.18,
+  "report_id": "dc4766b20dbe",
+  "description": "Brazilians passionate about specialty coffee and espresso machines",
+  "location_name": "Brazil",
+  "language_code": "en",
+  "depth": "full",
+  "seed_keywords": [
+    "melhor café especial brasil",
+    "espresso machine reviews brazil",
+    "onde comprar café especial online",
+    "curso barista online brasil",
+    "tipos de grãos de café especial",
+    "como fazer café especial em casa",
+    "cafeterias com café especial sp",
+    "preço máquina de espresso profissional",
+    "receitas com café especial",
+    "acessórios para máquina de café espresso",
+    "melhor moedor de café para espresso",
+    "como limpar máquina de espresso",
+    "café especial torrado perto de mim",
+    "comprar café especial em grãos online",
+    "espresso machine under 1000 reais",
+    "café especial para iniciantes",
+    "diferença entre café especial e gourmet",
+    "como avaliar um café especial",
+    "café especial acidez baixa",
+    "café especial plantação brasil",
+    "cafe especial",
+    "maquina de cafe expresso",
+    "cafe gourmet"
+  ],
+  "seed_count": 23
+}

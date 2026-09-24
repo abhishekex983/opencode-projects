@@ -1,0 +1,109 @@
+{
+  "name": "Guardrails Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gr-data-store",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-1",
+      "name": "Guardrails Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [460, 300],
+      "typeVersion": 2,
+      "webhookId": "gr-data-store"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.guardrails) staticData.guardrails = [];\nif (!staticData.gr_documents) staticData.gr_documents = [];\nif (!staticData.next_gr_id) staticData.next_gr_id = 1;\nif (!staticData.next_gr_doc_id) staticData.next_gr_doc_id = 1;\n\nconst input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\nconst action = body.action || 'ping';\n\nfunction now() { return new Date().toISOString(); }\nlet result = {};\n\nswitch (action) {\n  case 'ping':\n    result = { ok: true, message: 'Guardrails Manager webhook reachable', received_at: now() };\n    break;\n  case 'create_guardrail': {\n    const name = (body.name || '').trim();\n    if (!name) { result = { error: 'Guardrail name is required.' }; break; }\n    const gr = { id: staticData.next_gr_id++, name, description: (body.description || '').trim(), created_at: now() };\n    staticData.guardrails.push(gr);\n    result = { ok: true, guardrail: gr };\n    break;\n  }\n  case 'list_guardrails': {\n    const grs = staticData.guardrails.map(gr => {\n      const docCount = staticData.gr_documents.filter(d => d.gr_id === gr.id).length;\n      return { ...gr, doc_count: docCount };\n    });\n    result = { guardrails: grs };\n    break;\n  }\n  case 'delete_guardrail': {\n    const grId = parseInt(body.guardrail_id);\n    if (!grId) { result = { error: 'guardrail_id is required.' }; break; }\n    const idx = staticData.guardrails.findIndex(g => g.id === grId);\n    if (idx === -1) { result = { error: 'Guardrail not found.' }; break; }\n    staticData.guardrails.splice(idx, 1);\n    staticData.gr_documents = staticData.gr_documents.filter(d => d.gr_id !== grId);\n    result = { ok: true };\n    break;\n  }\n  case 'upload_doc': {\n    const grId = parseInt(body.guardrail_id);\n    if (!grId) { result = { error: 'guardrail_id is required.' }; break; }\n    const gr = staticData.guardrails.find(g => g.id === grId);\n    if (!gr) { result = { error: 'Guardrail not found.' }; break; }\n    const filename = (body.filename || '').trim();\n    if (!filename) { result = { error: 'filename is required.' }; break; }\n    const content = (body.content || '').trim();\n    if (!content) { result = { error: 'content is required.' }; break; }\n    const docCount = staticData.gr_documents.filter(d => d.gr_id === grId).length;\n    if (docCount >= 20) { result = { error: 'Max 20 documents per guardrail.' }; break; }\n    const doc = { id: staticData.next_gr_doc_id++, gr_id: grId, filename, content, file_size: parseInt(body.file_size) || content.length, uploaded_at: now() };\n    staticData.gr_documents.push(doc);\n    result = { ok: true, document: { id: doc.id, filename: doc.filename, file_size: doc.file_size } };\n    break;\n  }\n  case 'list_docs': {\n    const grId = parseInt(body.guardrail_id);\n    if (!grId) { result = { error: 'guardrail_id is required.' }; break; }\n    const docs = staticData.gr_documents.filter(d => d.gr_id === grId).map(d => ({ id: d.id, filename: d.filename, file_size: d.file_size, uploaded_at: d.uploaded_at }));\n    result = { documents: docs };\n    break;\n  }\n  case 'delete_doc': {\n    const grId = parseInt(body.guardrail_id);\n    const docId = parseInt(body.doc_id);\n    if (!grId || !docId) { result = { error: 'guardrail_id and doc_id are required.' }; break; }\n    const idx = staticData.gr_documents.findIndex(d => d.id === docId && d.gr_id === grId);\n    if (idx === -1) { result = { error: 'Document not found.' }; break; }\n    staticData.gr_documents.splice(idx, 1);\n    result = { ok: true };\n    break;\n  }\n  case 'get_content': {\n    const grId = parseInt(body.guardrail_id);\n    if (!grId) { result = { error: 'guardrail_id is required.' }; break; }\n    const gr = staticData.guardrails.find(g => g.id === grId);\n    if (!gr) { result = { error: 'Guardrail not found.' }; break; }\n    const docs = staticData.gr_documents.filter(d => d.gr_id === grId);\n    const text = docs.map(d => '## ' + d.filename + '\\n\\n' + d.content).join('\\n\\n---\\n\\n');\n    result = { guardrail_id: grId, guardrail_name: gr.name, content: text, doc_count: docs.length };\n    break;\n  }\n  default:\n    result = { error: 'Unknown action: ' + action };\n}\nreturn [{ json: result }];"
+      },
+      "id": "code-1",
+      "name": "Guardrails Manager Logic",
+      "type": "n8n-nodes-base.code",
+      "position": [700, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-1",
+      "name": "Respond with JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [940, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "position": [460, 500],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 500
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "error-respond",
+      "name": "Respond with Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [700, 500],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Guardrails Webhook": {
+      "main": [
+        [
+          {
+            "node": "Guardrails Manager Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardrails Manager Logic": {
+      "main": [
+        [
+          {
+            "node": "Respond with JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Respond with Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0
+}

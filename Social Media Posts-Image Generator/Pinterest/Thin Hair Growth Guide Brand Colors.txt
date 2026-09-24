@@ -1,0 +1,7 @@
+Main color: #002444
+Secondary color: #b91c1c
+
+## Logo (STRICTLY use only these files)
+
+- Light backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide logo.png
+- Dark backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide ( White logo).png

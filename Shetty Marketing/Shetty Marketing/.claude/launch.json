@@ -1,0 +1,44 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "portfolio",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-m", "http.server", "8765"],
+      "port": 8765
+    },
+    {
+      "name": "interlinkr",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "F:/Claude/Projects/Internal Linking Project",
+        "run",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "job-finder",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "F:/Claude/Projects/Job Listings Finder",
+        "start"
+      ],
+      "port": 5180
+    },
+    {
+      "name": "seo-suite",
+      "runtimeExecutable": "py",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8766",
+        "--directory",
+        "F:/Claude/Projects/SEO suite"
+      ],
+      "port": 8766
+    }
+  ]
+}

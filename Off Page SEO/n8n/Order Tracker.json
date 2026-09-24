@@ -1,0 +1,71 @@
+{
+  "name": "Order Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-tracker",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "order-tracker"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ── Utilities ────────────────────────────────────────────────────────────────\nfunction normalizeDomain(raw) {\n  if (!raw) return '';\n  var s = String(raw).trim().toLowerCase();\n  s = s.replace(/^https?:\\/\\//, '').replace(/^www\\./, '');\n  return s.split('/')[0].split('?')[0].split('#')[0];\n}\n\n// ── DataforSEO ───────────────────────────────────────────────────────────────\nvar API_BASE = 'https://api.dataforseo.com/v3';\nvar API_KEY  = Buffer.from('abhishekbolarshetty@gmail.com:6aa69ca0a4bf8188').toString('base64');\nvar AUTH_HDR = 'Basic ' + API_KEY;\n\nasync function dfsPost(endpoint, body) {\n  try {\n    var result = await this.helpers.httpRequest({\n      method:  'POST',\n      url:     API_BASE + endpoint,\n      headers: { 'Authorization': AUTH_HDR, 'Content-Type': 'application/json' },\n      body:    JSON.stringify(body),\n      returnFullResponse: false,\n      ignoreHttpStatusErrors: true\n    });\n    return typeof result === 'string' ? JSON.parse(result) : result;\n  } catch (e) {\n    return { _error: e.message, tasks: [] };\n  }\n}\n\n// ── Top-level try/catch ensures Respond node always gets valid JSON ──────────\ntry {\n\n// Parse input — n8n webhook v2 wraps POST body under .body\nvar rawInput = $input.first().json;\nvar input    = (rawInput.body && typeof rawInput.body === 'object') ? rawInput.body : rawInput;\n\n// Ping mode for the dashboard's \"Test\" button\nif (input.ping === true) {\n  return [{ json: { success: true, ping: 'ok', service: 'order-tracker' } }];\n}\n\nvar target     = normalizeDomain(input.target || '');\nvar rootDomain = normalizeDomain(input.root_domain || '');\n\nif (!target || !rootDomain) {\n  return [{ json: {\n    success: false,\n    error: 'Both `target` (your domain) and `root_domain` (publisher domain) are required.',\n    debug_received: rawInput\n  } }];\n}\n\n// Build DataforSEO request — find backlinks pointing TO `target` FROM `rootDomain`\n// Match the root domain itself + any subdomain (blog., www., etc.)\nvar dfsBody = [{\n  target: target,\n  limit: 1000,\n  mode: 'as_is',\n  backlinks_status_type: 'live',\n  include_subdomains: true,\n  include_indirect_links: true,\n  exclude_internal_backlinks: true,\n  filters: [\n    ['domain_from', '=', rootDomain],\n    'or',\n    ['domain_from', 'like', '%.' + rootDomain]\n  ],\n  order_by: ['rank,desc']\n}];\n\nvar resp = await dfsPost.call(this, '/backlinks/backlinks/live', dfsBody);\n\nif (resp._error) {\n  return [{ json: {\n    success: false,\n    root_domain: rootDomain,\n    error: 'DataforSEO request failed: ' + resp._error\n  } }];\n}\n\nvar task = resp && resp.tasks && resp.tasks[0];\nif (!task) {\n  return [{ json: {\n    success: false,\n    root_domain: rootDomain,\n    error: 'No task in DataforSEO response',\n    raw: resp\n  } }];\n}\n\nif (task.status_code && task.status_code !== 20000) {\n  return [{ json: {\n    success: false,\n    root_domain: rootDomain,\n    error: 'DataforSEO error ' + task.status_code + ': ' + (task.status_message || 'unknown'),\n    cost: resp.cost || 0\n  } }];\n}\n\nvar r0    = task.result && task.result[0];\nvar items = (r0 && r0.items) || [];\nvar total = (r0 && typeof r0.total_count === 'number') ? r0.total_count : items.length;\n\n// Map DataforSEO items → frontend shape\nvar links = items.map(function(it) {\n  return {\n    page_url:    it.url_from   || '',\n    domain_from: it.domain_from || '',\n    anchor:      (it.anchor || '').slice(0, 200),\n    follow:      it.dofollow !== false,           // dofollow boolean → follow\n    is_lost:     !!it.is_lost,\n    first_seen:  it.first_seen || '',\n    last_seen:   it.last_seen  || '',\n    page_rank:   typeof it.rank === 'number' ? it.rank : null,\n    text_pre:    (it.text_pre || '').slice(0, 200)\n  };\n}).filter(function(l) { return !l.is_lost; });   // only keep currently live links\n\nreturn [{ json: {\n  success:     true,\n  root_domain: rootDomain,\n  target:      target,\n  total_found: links.length,\n  total_in_index: total,\n  cost:        resp.cost || 0,\n  links:       links\n} }];\n\n} catch (topErr) {\n  return [{ json: {\n    success: false,\n    error:   String(topErr),\n    stack:   topErr && topErr.stack ? topErr.stack.slice(0, 800) : ''\n  } }];\n}"
+      },
+      "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "name": "Find Backlinks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [272, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              { "name": "Access-Control-Allow-Origin",  "value": "*" },
+              { "name": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
+              { "name": "Access-Control-Allow-Headers", "value": "Content-Type" },
+              { "name": "Content-Type",                 "value": "application/json" }
+            ]
+          }
+        }
+      },
+      "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [528, 0]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Find Backlinks", "type": "main", "index": 0 }]]
+    },
+    "Find Backlinks": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "00000000-0000-0000-0000-000000000001",
+  "meta": {
+    "instanceId": "order-tracker-v1"
+  },
+  "id": "OrderTrackerV1",
+  "tags": []
+}

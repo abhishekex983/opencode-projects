@@ -1,0 +1,244 @@
+{
+  "name": "Marketing Insights -- Drive Indexer (Daily)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Marketing Insights -- Drive Indexer\n\n**Runs:** Daily at 03:00 server time.\n\n**Flow:**\n1. `Drive Whoami` -- which Google account is the credential authenticated as?\n2. `Drive Folder Meta` -- can we see the target folder?\n3. `Drive: Walk Tree` -- BFS through the folder and ALL subfolders, returning every Google Doc + Sheet under the tree. Uses the attached Drive OAuth credential.\n4. `Plan & Filter` -- query Supabase for existing chunks, return one item per file that needs (re)indexing.\n5. `Drive Export File` -- export each file's content (Docs -> text, Sheets -> CSV). Fires once per planned file.\n6. `Embed & Upsert` -- chunk text, embed via OpenAI, upsert into `marketing_doc_chunks`.\n7. `Summary` -- aggregate per-file results into one final JSON.\n\n**Setup -- paste 3 secrets into the `Plan & Filter` and `Embed & Upsert` Code nodes:**\n- `OPENAI_API_KEY`\n- `SUPABASE_URL`\n- `SUPABASE_KEY` (service_role)\n\n**Important:** `Drive: Walk Tree` uses `requestWithAuthentication`, so the same `Google Drive account` credential must be attached to that node (re-import should auto-link by ID; otherwise open the node and pick the credential).\n\n**Manual run:** click `Execute Workflow`. Watch the `Summary` node for the final JSON.",
+        "height": 480,
+        "width": 540
+      },
+      "id": "sticky-readme-index",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1080, -360]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "index-schedule",
+      "name": "Daily 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-1080, 80]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/drive/v3/about",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "fields", "value": "user(emailAddress,displayName)" }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "drive-whoami",
+      "name": "Drive: Whoami",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-860, 80],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CNSIF1gvCP8wTqUd",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files/1iiu1PXh1LilB7B9mmJ2ZBLZIuMMGJ8Kd",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "fields", "value": "id,name,mimeType,owners(emailAddress,displayName),capabilities(canListChildren),driveId" },
+            { "name": "supportsAllDrives", "value": "true" }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": { "response": { "fullResponse": false, "neverError": true } }
+        }
+      },
+      "id": "drive-folder-meta",
+      "name": "Drive: Folder Meta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-660, 80],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CNSIF1gvCP8wTqUd",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Recursively walk the Drive folder tree under FOLDER_ID using BFS and\n// return every Google Doc + Sheet anywhere in the tree (not just direct\n// children). Uses this node's attached Drive OAuth2 credential.\n//\n// Output shape matches the old HTTP node: { files: [...] } so Plan & Filter\n// keeps working without changes.\n\nconst FOLDER_ID   = '1iiu1PXh1LilB7B9mmJ2ZBLZIuMMGJ8Kd';\nconst DOC_MIME    = 'application/vnd.google-apps.document';\nconst SHEET_MIME  = 'application/vnd.google-apps.spreadsheet';\nconst FOLDER_MIME = 'application/vnd.google-apps.folder';\nconst MAX_FOLDERS = 2000; // safety cap so a pathological tree can't run forever\n\nasync function driveList(qs) {\n  return await this.helpers.httpRequestWithAuthentication.call(\n    this,\n    'googleDriveOAuth2Api',\n    {\n      method: 'GET',\n      url: 'https://www.googleapis.com/drive/v3/files',\n      qs,\n      json: true,\n      timeout: 30000\n    }\n  );\n}\nconst boundList = driveList.bind(this);\n\nconst visited     = new Set();\nconst queue       = [FOLDER_ID];\nconst files       = [];\nconst skippedDirs = []; // folders we couldn't read -- surfaced for debugging\n\nwhile (queue.length && visited.size < MAX_FOLDERS) {\n  const folderId = queue.shift();\n  if (visited.has(folderId)) continue;\n  visited.add(folderId);\n\n  let pageToken;\n  do {\n    let resp;\n    try {\n      resp = await boundList({\n        q: `'${folderId}' in parents and trashed = false`,\n        fields: 'nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,parents)',\n        pageSize: 1000,\n        pageToken,\n        supportsAllDrives: 'true',\n        includeItemsFromAllDrives: 'true'\n      });\n    } catch (e) {\n      skippedDirs.push({ folder_id: folderId, error: String(e.message || e).slice(0, 200) });\n      resp = { files: [] };\n      pageToken = undefined;\n      break;\n    }\n\n    for (const f of (resp.files || [])) {\n      if (f.mimeType === FOLDER_MIME) {\n        if (!visited.has(f.id)) queue.push(f.id);\n      } else if (f.mimeType === DOC_MIME || f.mimeType === SHEET_MIME) {\n        files.push(f);\n      }\n    }\n    pageToken = resp.nextPageToken;\n  } while (pageToken);\n}\n\nreturn [{\n  json: {\n    files,\n    folders_walked: visited.size,\n    folders_skipped: skippedDirs\n  }\n}];"
+      },
+      "id": "drive-list-children",
+      "name": "Drive: Walk Tree",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-460, 80],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CNSIF1gvCP8wTqUd",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Plan & Filter\n// Combine outputs from Whoami / Folder Meta / List Children, query Supabase\n// for already-indexed files, and emit ONE ITEM PER FILE that needs (re)indexing.\n// If the folder isn't accessible, emit a single diagnostic item so the run\n// stops with a useful error instead of silently doing nothing.\n//\n// ----- CONFIG (only Supabase needed here) ---------------------\nconst SUPABASE_URL = 'https://xirmohenadyurcwlnchy.supabase.co';\nconst SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpcm1vaGVuYWR5dXJjd2xuY2h5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQxMDU4MCwiZXhwIjoyMDk0OTg2NTgwfQ.WcUpZXQHJ57z0Qm8Cd-V0oYl2KzHwbae-Qv4L9e1w_8';\nconst FOLDER_ID    = '1iiu1PXh1LilB7B9mmJ2ZBLZIuMMGJ8Kd';\n// --------------------------------------------------------------\n\nconst whoamiResp     = (($('Drive: Whoami').first()       || {}).json) || {};\nconst folderMetaResp = (($('Drive: Folder Meta').first()  || {}).json) || {};\nconst listResp       = (($('Drive: Walk Tree').first()    || {}).json) || {};\n\nconst connectedUser = whoamiResp.user || null;\n\n// Folder visibility check -- if folder meta came back with an error shape, bail\nconst folderOk = folderMetaResp && folderMetaResp.id === FOLDER_ID;\nif (!folderOk) {\n  return [{ json: {\n    __halt: true,\n    diagnostic: 'Folder is not visible to the connected Drive account.',\n    connected_as: connectedUser,\n    folder_id_used: FOLDER_ID,\n    folder_meta_response: folderMetaResp,\n    fix_options: [\n      connectedUser && connectedUser.emailAddress ? `Share the folder with ${connectedUser.emailAddress}` : 'Share the folder with the connected account',\n      'OR reconnect the Drive credential using the account that owns the folder',\n      'OR verify the folder ID matches the URL'\n    ]\n  }}];\n}\n\nconst files = (listResp && listResp.files) || [];\nif (files.length === 0) {\n  return [{ json: {\n    __halt: true,\n    diagnostic: 'Folder is visible but no Google Docs or Sheets were found anywhere in the tree.',\n    connected_as: connectedUser,\n    folder_info: folderMetaResp,\n    folders_walked: listResp.folders_walked,\n    folders_skipped: listResp.folders_skipped,\n    fix_options: [\n      'Confirm the folder (or its subfolders) actually contains .gdoc/.gsheet files -- PDFs, slides, images, and non-Google formats are intentionally skipped',\n      'If folders_skipped is non-empty, the credential lacks permission on those subfolders -- share them with the connected account'\n    ]\n  }}];\n}\n\n// Query Supabase for already-indexed files\nlet indexedMap = new Map();\ntry {\n  const indexedRows = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${SUPABASE_URL}/rest/v1/marketing_doc_files?select=drive_file_id,modified_time`,\n    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },\n    json: true, timeout: 30000\n  });\n  for (const r of (indexedRows || [])) indexedMap.set(r.drive_file_id, r.modified_time);\n} catch (e) {\n  return [{ json: {\n    __halt: true,\n    error: 'Could not query Supabase for indexed state',\n    detail: String(e.message || e).slice(0, 300),\n    connected_as: connectedUser\n  }}];\n}\n\nconst changed = files.filter(f => {\n  const last = indexedMap.get(f.id);\n  if (!last) return true;\n  return new Date(f.modifiedTime).getTime() > new Date(last).getTime();\n});\n\nif (changed.length === 0) {\n  return [{ json: {\n    __halt: true,\n    diagnostic: 'Folder visible, files found, but nothing has changed since the last index.',\n    connected_as: connectedUser,\n    total_in_folder: files.length,\n    indexed_so_far: indexedMap.size\n  }}];\n}\n\n// Emit one item per file to (re)index\nreturn changed.map(f => ({\n  json: {\n    __halt: false,\n    drive_file_id: f.id,\n    file_name:     f.name,\n    file_url:      f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,\n    mime_type:     f.mimeType,\n    modified_time: f.modifiedTime,\n    export_mime:   f.mimeType === 'application/vnd.google-apps.document' ? 'text/plain' : 'text/csv',\n    connected_as:  connectedUser,\n    total_in_folder: files.length\n  }\n}));"
+      },
+      "id": "index-plan",
+      "name": "Plan & Filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-260, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "halt-cond",
+              "leftValue": "={{ !!$json.__halt }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "index-is-halt",
+      "name": "Halt?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-60, 80]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/drive/v3/files/{{ $json.drive_file_id }}/export",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "mimeType", "value": "={{ $json.export_mime }}" }
+          ]
+        },
+        "options": {
+          "timeout": 90000,
+          "response": { "response": { "responseFormat": "text", "neverError": true } }
+        }
+      },
+      "id": "drive-export",
+      "name": "Drive: Export File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [160, 200],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "CNSIF1gvCP8wTqUd",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Embed & Upsert\n// For each file (one item per input), chunk the exported text, embed each chunk\n// via OpenAI, then delete-then-insert into Supabase. Returns one item per file\n// reporting success/failure.\n//\n// ----- CONFIG ------------------------------------------------\nconst OPENAI_API_KEY = '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';\nconst SUPABASE_URL   = 'https://xirmohenadyurcwlnchy.supabase.co';\nconst SUPABASE_KEY   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhpcm1vaGVuYWR5dXJjd2xuY2h5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTQxMDU4MCwiZXhwIjoyMDk0OTg2NTgwfQ.WcUpZXQHJ57z0Qm8Cd-V0oYl2KzHwbae-Qv4L9e1w_8';\nconst EMBEDDING_MODEL = 'text-embedding-3-small';\nconst CHUNK_TOKENS    = 800;\nconst CHUNK_OVERLAP   = 100;\nconst EMBED_BATCH     = 16;\nconst INSERT_BATCH    = 100;\n// --------------------------------------------------------------\n\nfunction chunkText(text, fileName) {\n  const charSize    = CHUNK_TOKENS  * 4;\n  const charOverlap = CHUNK_OVERLAP * 4;\n  const cleaned = String(text || '').replace(/\\u0000/g, '').replace(/\\r\\n/g, '\\n').trim();\n  if (!cleaned) return [];\n  const out = [];\n  let i = 0;\n  while (i < cleaned.length) {\n    let end = Math.min(i + charSize, cleaned.length);\n    if (end < cleaned.length) {\n      const win = cleaned.slice(Math.max(end - 200, i + 1), end + 200);\n      const m = win.search(/\\n\\n|\\. /);\n      if (m !== -1) end = Math.max(end - 200, i + 1) + m;\n    }\n    const piece = cleaned.slice(i, end).trim();\n    if (piece) out.push(`[Source: ${fileName}]\\n${piece}`);\n    if (end >= cleaned.length) break;\n    i = Math.max(end - charOverlap, i + 1);\n  }\n  return out;\n}\n\nasync function embedBatch(texts) {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://api.openai.com/v1/embeddings',\n    headers: {\n      Authorization: `Bearer ${OPENAI_API_KEY}`,\n      'Content-Type': 'application/json'\n    },\n    body: { input: texts, model: EMBEDDING_MODEL },\n    json: true, timeout: 90000\n  });\n  return (resp.data || []).map(d => d.embedding);\n}\n\nasync function deleteChunks(fileId) {\n  await this.helpers.httpRequest({\n    method: 'DELETE',\n    url: `${SUPABASE_URL}/rest/v1/marketing_doc_chunks?drive_file_id=eq.${encodeURIComponent(fileId)}`,\n    headers: {\n      apikey: SUPABASE_KEY,\n      Authorization: `Bearer ${SUPABASE_KEY}`,\n      Prefer: 'return=minimal'\n    },\n    timeout: 30000\n  });\n}\n\nasync function insertChunksBatch(rows) {\n  for (let i = 0; i < rows.length; i += INSERT_BATCH) {\n    const slice = rows.slice(i, i + INSERT_BATCH);\n    await this.helpers.httpRequest({\n      method: 'POST',\n      url: `${SUPABASE_URL}/rest/v1/marketing_doc_chunks`,\n      headers: {\n        apikey: SUPABASE_KEY,\n        Authorization: `Bearer ${SUPABASE_KEY}`,\n        'Content-Type': 'application/json',\n        Prefer: 'return=minimal'\n      },\n      body: slice,\n      json: true, timeout: 90000\n    });\n  }\n}\n\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  const meta = item.json || {};\n  const fileId   = meta.drive_file_id;\n  const fileName = meta.file_name;\n  const fileUrl  = meta.file_url;\n  const mimeType = meta.mime_type;\n  const modified = meta.modified_time;\n\n  // The Drive Export node attaches the file body. When responseFormat=text,\n  // n8n puts the body under either `data` or a single key in the json; if the\n  // request fails it may be under `body` or empty. Be lenient.\n  let text = '';\n  if (typeof meta.data === 'string')      text = meta.data;\n  else if (typeof meta.body === 'string') text = meta.body;\n  else if (typeof meta === 'string')      text = meta;\n  else {\n    // Last resort: stringify whatever non-meta keys are present\n    const extra = { ...meta };\n    ['drive_file_id','file_name','file_url','mime_type','modified_time','export_mime','connected_as','total_in_folder','__halt'].forEach(k => delete extra[k]);\n    const k = Object.keys(extra)[0];\n    if (k && typeof extra[k] === 'string') text = extra[k];\n  }\n\n  if (!text.trim()) {\n    results.push({ json: { file_id: fileId, file_name: fileName, ok: false, error: 'export returned empty body' }});\n    continue;\n  }\n\n  try {\n    const chunks = chunkText(text, fileName);\n    if (!chunks.length) {\n      results.push({ json: { file_id: fileId, file_name: fileName, ok: false, error: 'no chunks produced' }});\n      continue;\n    }\n\n    const embeddings = [];\n    for (let i = 0; i < chunks.length; i += EMBED_BATCH) {\n      const batch = chunks.slice(i, i + EMBED_BATCH);\n      const vecs  = await embedBatch.call(this, batch);\n      if (vecs.length !== batch.length) throw new Error('embedding count mismatch');\n      embeddings.push(...vecs);\n    }\n\n    const rows = chunks.map((content, idx) => ({\n      drive_file_id: fileId,\n      file_name:     fileName,\n      file_url:      fileUrl,\n      mime_type:     mimeType,\n      modified_time: modified,\n      chunk_index:   idx,\n      content,\n      embedding:     embeddings[idx]\n    }));\n\n    await deleteChunks.call(this, fileId);\n    await insertChunksBatch.call(this, rows);\n    results.push({ json: { file_id: fileId, file_name: fileName, ok: true, chunks: chunks.length }});\n  } catch (e) {\n    results.push({ json: { file_id: fileId, file_name: fileName, ok: false, error: String(e.message || e).slice(0, 240) }});\n  }\n}\n\nreturn results;"
+      },
+      "id": "index-embed-upsert",
+      "name": "Embed & Upsert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [380, 200]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Aggregate per-file results into one final summary.\nconst results = $input.all().map(i => i.json || {});\nconst connected = (($('Plan & Filter').first() || {}).json || {}).connected_as || null;\nconst totalInFolder = (($('Plan & Filter').first() || {}).json || {}).total_in_folder || 0;\n\nconst indexed = results.filter(r => r.ok);\nconst failed  = results.filter(r => !r.ok);\n\nreturn [{\n  json: {\n    total_in_folder: totalInFolder,\n    attempted:       results.length,\n    indexed:         indexed.length,\n    failed:          failed.length,\n    errors:          failed.map(f => ({ file: f.file_name, error: f.error })),\n    indexed_files:   indexed.map(f => ({ file: f.file_name, chunks: f.chunks })),\n    connected_as:    connected,\n    finished_at:     new Date().toISOString()\n  }\n}];"
+      },
+      "id": "index-summary",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 200]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Halted -- just pass through the diagnostic item so the user can see why.\nreturn $input.all();"
+      },
+      "id": "index-halt-passthrough",
+      "name": "Halt Passthrough",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, -60]
+    }
+  ],
+  "connections": {
+    "Daily 03:00": {
+      "main": [[{ "node": "Drive: Whoami", "type": "main", "index": 0 }]]
+    },
+    "Drive: Whoami": {
+      "main": [[{ "node": "Drive: Folder Meta", "type": "main", "index": 0 }]]
+    },
+    "Drive: Folder Meta": {
+      "main": [[{ "node": "Drive: Walk Tree", "type": "main", "index": 0 }]]
+    },
+    "Drive: Walk Tree": {
+      "main": [[{ "node": "Plan & Filter", "type": "main", "index": 0 }]]
+    },
+    "Plan & Filter": {
+      "main": [[{ "node": "Halt?", "type": "main", "index": 0 }]]
+    },
+    "Halt?": {
+      "main": [
+        [{ "node": "Halt Passthrough", "type": "main", "index": 0 }],
+        [{ "node": "Drive: Export File", "type": "main", "index": 0 }]
+      ]
+    },
+    "Drive: Export File": {
+      "main": [[{ "node": "Embed & Upsert", "type": "main", "index": 0 }]]
+    },
+    "Embed & Upsert": {
+      "main": [[{ "node": "Summary", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -1,0 +1,647 @@
+{
+  "name": "Content Optimizer -- Outline + Content",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Content Optimizer -- Service-Page Generator\n\n**Two webhooks, one workflow:**\n\n1. `POST /content-optimizer-outline` -- accepts either text OR audio (base64), plus focus keyword / header keywords / entities / common keywords / extra keywords. Transcribes audio through OpenRouter (Gemini 2.5 Flash by default), then generates a markdown outline following F:\\Ranking Tracker\\Content Optimizer\\Outline Format.txt.\n\n2. `POST /content-optimizer-content` -- accepts the marketer-edited outline + the same keyword inputs, expands it into final SEO copy.\n\n**Before running:**\n1. In every Code node that starts with `const OPENROUTER_API_KEY = ...`, replace the placeholder with your real OpenRouter key (get it from https://openrouter.ai/keys). There are THREE spots: Get Transcript, Build Outline Prompt, Build Content Prompt.\n2. Activate the workflow and copy the two Production webhook URLs into the frontend's Content Optimizer tab.\n3. Both webhook nodes have `allowedOrigins: \"*\"` for CORS.\n\n**Model choices (all swappable in the Code nodes):**\n- Transcription: `google/gemini-2.5-flash` (multimodal, ~$0.075/1M input tokens)\n- Outline + content: `anthropic/claude-sonnet-4.5` (strongest for long-form SEO + structure)\n- Cheaper alternatives: swap outline/content to `google/gemini-2.5-pro` or `openai/gpt-4o-mini`.",
+        "height": 540,
+        "width": 460
+      },
+      "id": "sticky-readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1000,
+        -280
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## OpenRouter setup\n\nOpenRouter API key is already baked into the Code nodes (Get Transcript, Build Outline Prompt, Build Content Prompt). To rotate the key, edit those 3 nodes.\n\nPricing (check openrouter.ai for current):\n- gemini-2.5-flash: ~$0.075/1M in, $0.30/1M out (audio counts as input tokens)\n- claude-sonnet-4.5: ~$3/1M in, $15/1M out\n- gpt-4o-mini: ~$0.15/1M in, $0.60/1M out (fallback)\n\nAudio transcription accepts OpenAI-style `input_audio` blocks: wav, mp3, m4a, webm. The frontend records as webm by default.",
+        "height": 320,
+        "width": 460,
+        "color": 5
+      },
+      "id": "sticky-openrouter",
+      "name": "OpenRouter Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1000,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-optimizer-outline",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "outline-webhook",
+      "name": "Outline Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        0
+      ],
+      "webhookId": "content-optimizer-outline"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond-outline-is-test",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "outline-is-test",
+      "name": "Is Outline Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "outline-respond-test",
+      "name": "Respond Outline Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Normalize inputs from the outline webhook. Matches the existing project pattern\n// of handling both raw body and {body: {...}} wrap, plus label/name variants.\nconst input = $input.first().json;\nconst form = (input && typeof input.body === 'object' && input.body !== null && Object.keys(input.body).length > 0)\n  ? input.body\n  : input;\n\nconst norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst pick = (...keys) => {\n  for (const k of keys) {\n    if (form[k] !== undefined && form[k] !== null && form[k] !== '') return form[k];\n  }\n  const targets = keys.map(norm);\n  for (const k of Object.keys(form)) {\n    const n = norm(k);\n    if (targets.some(t => n === t || n.startsWith(t))) return form[k];\n  }\n  return '';\n};\n\n// Keywords can arrive as comma-separated strings or arrays. Normalize to arrays.\nconst toArr = v => {\n  if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean);\n  if (typeof v === 'string') return v.split(/[,;\\n]/).map(s => s.trim()).filter(Boolean);\n  return [];\n};\n\nreturn [{\n  json: {\n    input_type: pick('input_type', 'inputType') || 'text',\n    text: pick('text', 'client_text', 'clientText') || '',\n    audio_base64: pick('audio_base64', 'audioBase64') || '',\n    audio_format: pick('audio_format', 'audioFormat') || 'webm',\n    focus_keyword: pick('focus_keyword', 'Focus Keyword', 'focusKeyword') || '',\n    header_keywords: toArr(pick('header_keywords', 'Header Keywords', 'headerKeywords')),\n    entities: toArr(pick('entities', 'Entities')),\n    common_keywords: toArr(pick('common_keywords', 'Common Keywords', 'commonKeywords')),\n    extra_keywords: toArr(pick('extra_keywords', 'Extra Keywords', 'extraKeywords')),\n    intent_context_text: String(pick('intent_context_text', 'intentContextText') || '').trim(),\n    salience_context_text: String(pick('salience_context_text', 'salienceContextText') || '').trim(),\n    audience_context_text: String(pick('audience_context_text', 'audienceContextText') || '').trim(),\n    guardrail_id: parseInt(pick('guardrail_id', 'guardrailId')) || 0,\n    _raw_form_keys: Object.keys(form)\n  }\n}];"
+      },
+      "id": "outline-normalize",
+      "name": "Normalize Outline Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// If audio was supplied, send it to OpenRouter for transcription.\n// Otherwise pass the raw text through unchanged.\n//\n// REPLACE the OPENROUTER_API_KEY constant with your own key.\n// Audio transcription model: google/gemini-2.5-flash is cheap + multimodal.\n// Swap the TRANSCRIBE_MODEL below if you want a different transcription model.\n\nconst OPENROUTER_API_KEY = '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';\nconst TRANSCRIBE_MODEL   = 'google/gemini-2.5-flash';\n\nconst form = $('Normalize Outline Inputs').first().json;\nconst hasAudio = !!(form.audio_base64 && form.audio_base64.length > 100);\n\nif (!hasAudio) {\n  return [{\n    json: {\n      transcript: form.text || '',\n      source: 'text',\n      transcription_model: null\n    }\n  }];\n}\n\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://openrouter.ai/api/v1/chat/completions',\n    headers: {\n      'Authorization': 'Bearer ' + OPENROUTER_API_KEY,\n      'Content-Type': 'application/json',\n      'HTTP-Referer': 'https://shettymarketing.com',\n      'X-Title': 'Content Optimizer (n8n)'\n    },\n    body: {\n      model: TRANSCRIBE_MODEL,\n      messages: [{\n        role: 'user',\n        content: [\n          { type: 'text', text: 'Transcribe the audio verbatim. Output only the transcribed text. Do not summarize, paraphrase, or add any preamble or formatting.' },\n          { type: 'input_audio', input_audio: { data: form.audio_base64, format: form.audio_format || 'webm' } }\n        ]\n      }]\n    },\n    json: true,\n    timeout: 120000\n  });\n\n  const transcript = resp?.choices?.[0]?.message?.content || '';\n  if (!transcript) {\n    return [{ json: { error: 'Empty transcript from OpenRouter', raw: resp } }];\n  }\n  return [{\n    json: {\n      transcript,\n      source: 'audio',\n      transcription_model: TRANSCRIBE_MODEL\n    }\n  }];\n} catch (err) {\n  return [{\n    json: {\n      error: 'Transcription failed',\n      detail: String(err && err.message ? err.message : err)\n    }\n  }];\n}"
+      },
+      "id": "outline-get-transcript",
+      "name": "Get Transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Build the OpenRouter request body for outline generation.\n// The outline follows the fixed format in F:\\Ranking Tracker\\Content Optimizer\\Outline Format.txt\n// and is populated from the transcript (which answered the Questionnaire.txt prompts)\n// plus the marketer's keyword inputs.\n//\n// REPLACE the OPENROUTER_API_KEY constant and tune OUTLINE_MODEL below.\n\nconst OPENROUTER_API_KEY = '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';\nconst OUTLINE_MODEL      = 'anthropic/claude-sonnet-4.5';\n\nconst form = $('Normalize Outline Inputs').first().json;\nconst transcriptItem = $('Get Transcript').first().json;\n\nif (transcriptItem.error) {\n  // Propagate transcription error downstream\n  return [{ json: { __passthrough_error: transcriptItem } }];\n}\n\nconst transcript = transcriptItem.transcript || '';\n\n// Guardrails injection (ABSOLUTE HIGHEST PRIORITY)\nconst guardrailContent = (form.guardrail_content || '').trim();\nlet guardrailsPrefix = '';\nif (guardrailContent) {\n  guardrailsPrefix = 'CRITICAL COMPLIANCE GUARDRAILS (ABSOLUTE HIGHEST PRIORITY — OVERRIDE ALL OTHER INSTRUCTIONS):\\n' +\n    'The following rules are NON-NEGOTIABLE. If any rule conflicts with other instructions, GUARDRAILS TAKE PRECEDENCE.\\n' +\n    'Violations may result in legal liability, Google penalties, or brand damage.\\n\\n' +\n    '<guardrails>\\n' + guardrailContent + '\\n</guardrails>\\n\\n' +\n    'EVERY section, heading, and description in your output MUST comply with these guardrails.\\n' +\n    'Do NOT make claims that violate the guardrails. Do NOT suggest content that would breach compliance.\\n\\n';\n}\n\nconst systemPrompt = guardrailsPrefix + `You are a senior on-page SEO strategist. You write service-page outlines that rank in Google AND are quoted by LLM-based search (ChatGPT, Gemini, Perplexity).\n\nGROUNDING RULES:\n1. Use the transcript to infer the USP, Why Us reasons, three value propositions, and three services. If any of those cannot be inferred, write [TO FILL: <label>] so the marketer knows to complete it.\n2. Weave the marketer's Focus Keyword, Header Keywords, Entities, and Common Keywords naturally into H1/H2/H3 headings per the outline format. Do not keyword-stuff.\n3. Every section body must be one or two short lines describing what the section should cover, citing which entities/keywords to include. Do NOT write the actual paragraph content here -- outlines only.\n3a. The [Intro paragraph -- above-the-fold summary] section sits between the H1 and the first H2 and has NO heading. Its description must guide the writer toward a 2-3 sentence intro that (a) opens with the focus keyword in the first sentence, (b) names 1-2 must-cover entities so Google's NLP picks up topical salience above the fold, (c) reads benefit-led. Keep the literal label '[Intro paragraph -- above-the-fold summary]' in the outline so the writer recognises it.\n4. Preserve the exact section order and heading levels in the format template.\n5. SEARCH INTENT INSIGHTS: If <intent_context> contains content, treat it as authoritative truth about what users searching the focus keyword actually want. Tailor every section body to the stated primary intent. Use any listed sub-intents to inspire FAQ questions (at least 3 FAQ entries should mirror sub-intent labels, rephrased as questions). Honor any recommended page archetype. If a modifier-SERP conflict is flagged, follow the guidance even when it contradicts what the focus keyword superficially implies. If the block is empty, proceed normally.\n6. SALIENCE INSIGHTS: If <salience_context> contains content (must-cover entities, H2 candidates, supporting topics, target word count), integrate the must-cover entities naturally throughout the outline body descriptions, use H2 candidate phrasings where they fit the format template, and aim the implied content depth at the target word count. The format template's section order is canonical -- adapt the content to fit the template, not the other way around. If the block is empty, proceed normally.\n7. AUDIENCE RESEARCH: If <audience_context> contains content (problem clusters with representative questions and content angles, plus People Also Ask entries), use the listed *user problems* as the primary source for FAQ questions -- replace the generic FAQ placeholders with the highest-weighted clusters' representative questions, rephrased as natural user-style queries. Where a cluster lists a \"content_angle\", let it shape the body description of the most relevant section (intro, value props, or service section). If a cluster carries an emotional or trust concern (pain, cost, safety, side effects), surface it in either the intro or the closest H2 body so it's not buried in the FAQ. If <audience_context> is empty, proceed normally.\n\nTONE: Clear, benefit-led, scannable. No fluff.\n\nOUTPUT: Plain markdown. No preamble. No trailing commentary. No code fences.`;\n\nconst outlineFormat = `H1: {focus keyword}: {USP}\n\n[Intro paragraph -- above-the-fold summary]\nDescribe what the writer should put here (no heading). Aim: a 2-3 sentence above-the-fold summary that names the {focus keyword} in the first sentence, states who the page serves and what they'll get, mentions 1-2 must-cover entities or value propositions to anchor topical relevance, and reads benefit-led (not promotional).\n\nH2: Why Us [Include Header keywords and Entities]\nCreate content based on Entities, common keywords, and extra keywords.\n\nH3: [Value proposition 1 with Header keywords]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: [Value proposition 2 with Header keywords]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: [Value proposition 3 with Header keywords]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH2: Our Services [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: [Service 1 with Header keywords]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: [Service 2 with Header keywords]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: [Service 3 with Header keywords]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH2: What our clients say about us [Include Header keywords and Entities]\nCreate content based on Entities, common keywords, and extra keywords.\n\nH2: Contact Us [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH2: FAQ [Include Relevant Header keywords and Entities]\n\nH3: FAQ [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: FAQ [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: FAQ [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: FAQ [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: FAQ [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.\n\nH3: FAQ [Include Relevant Header keywords and Entities]\nCreate content based on the Entities, common keywords, and extra keywords.`;\n\nconst questionnaire = `The client transcript below answered these questions (from Questionnaire.txt):\n- What is your USP? (answer begins with \"We sell...\"; whatever follows is the value proposition)\n- Why us? (why prospects should buy, how it differs from competitors)\n- Three value propositions (e.g. \"$400M annual comp supported\", \"360 degree SPM service\", \"50+ combined experience years\")\n- What services we offer (service 1, service 2, service 3)`;\n\nconst userPrompt = `${questionnaire}\n\n<transcript source=\"${transcriptItem.source || 'text'}\">\n${transcript || '(empty -- client did not provide text or audio)'}\n</transcript>\n\n<marketer_inputs>\nFocus Keyword: ${form.focus_keyword || '(not set)'}\nHeader Keywords: ${(form.header_keywords || []).join(', ') || '(not set)'}\nEntities: ${(form.entities || []).join(', ') || '(not set)'}\nCommon Keywords: ${(form.common_keywords || []).join(', ') || '(not set)'}\nExtra Keywords: ${(form.extra_keywords || []).join(', ') || '(not set)'}\n</marketer_inputs>\n\n${guardrailContent ? `<guardrails>\\n${guardrailContent}\\n</guardrails>\\n\\n` : ``}<intent_context>\n${form.intent_context_text || '(not provided -- proceed using the focus keyword and transcript alone)'}\n</intent_context>\n\n<salience_context>\n${form.salience_context_text || '(not provided -- proceed without entity-coverage guidance)'}\n</salience_context>\n\n<audience_context>\n${form.audience_context_text || '(not provided -- proceed without audience-research guidance; FAQs should follow the focus keyword and intent context alone)'}\n</audience_context>\n\n`\n\n<outline_format>\n${outlineFormat}\n</outline_format>\n\nProduce the filled-in outline now. Replace every placeholder ({focus keyword}, {USP}, [Value proposition N with Header keywords], [Service N with Header keywords], [Include Header keywords and Entities], [Include Relevant Header keywords and Entities]) with specific content derived from the transcript + marketer inputs. Keep the \"Create content based on...\" description lines and tailor them to the entities/keywords most relevant to that section.`;\n\nreturn [{\n  json: {\n    transcript,\n    form,\n    openrouter_request: {\n      model: OUTLINE_MODEL,\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user',   content: userPrompt }\n      ],\n      temperature: 0.3\n    },\n    openrouter_api_key: OPENROUTER_API_KEY,\n    outline_model: OUTLINE_MODEL\n  }\n}];"
+      },
+      "id": "outline-build-prompt",
+      "name": "Build Outline Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.openrouter_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://shettymarketing.com"
+            },
+            {
+              "name": "X-Title",
+              "value": "Content Optimizer (n8n)"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openrouter_request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "outline-openrouter",
+      "name": "OpenRouter (Outline)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Extract the markdown outline from the OpenRouter response.\nconst resp = $input.first().json;\n\n// Short-circuit propagated errors from earlier nodes\nconst payload = $('Build Outline Prompt').first().json;\nif (payload.__passthrough_error) {\n  return [{ json: payload.__passthrough_error }];\n}\n\nif (resp.error) {\n  return [{ json: { error: 'OpenRouter returned error', detail: resp.error } }];\n}\n\nconst outline = resp?.choices?.[0]?.message?.content;\nif (!outline) {\n  return [{ json: { error: 'No outline in OpenRouter response', raw: resp } }];\n}\n\n// Strip accidental code fences just in case\nconst cleaned = outline.replace(/^```(?:markdown|md)?\\s*/i, '').replace(/\\s*```\\s*$/i, '').trim();\n\nreturn [{\n  json: {\n    request: {\n      focus_keyword: payload.form?.focus_keyword,\n      header_keywords: payload.form?.header_keywords,\n      entities: payload.form?.entities,\n      common_keywords: payload.form?.common_keywords,\n      extra_keywords: payload.form?.extra_keywords,\n      source: $('Get Transcript').first().json.source || 'text'\n    },\n    transcript: payload.transcript || '',\n    outline: cleaned,\n    model: payload.outline_model,\n    usage: resp.usage || null,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "outline-parse",
+      "name": "Parse Outline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "outline-respond",
+      "name": "Respond with Outline",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-optimizer-content",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "content-webhook",
+      "name": "Content Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -500,
+        600
+      ],
+      "webhookId": "content-optimizer-content"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond-content-is-test",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "content-is-test",
+      "name": "Is Content Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -300,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "content-respond-test",
+      "name": "Respond Content Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -100,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Normalize inputs for the content generation webhook.\nconst input = $input.first().json;\nconst form = (input && typeof input.body === 'object' && input.body !== null && Object.keys(input.body).length > 0)\n  ? input.body\n  : input;\n\nconst norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst pick = (...keys) => {\n  for (const k of keys) {\n    if (form[k] !== undefined && form[k] !== null && form[k] !== '') return form[k];\n  }\n  const targets = keys.map(norm);\n  for (const k of Object.keys(form)) {\n    const n = norm(k);\n    if (targets.some(t => n === t || n.startsWith(t))) return form[k];\n  }\n  return '';\n};\n\nconst toArr = v => {\n  if (Array.isArray(v)) return v.map(x => String(x).trim()).filter(Boolean);\n  if (typeof v === 'string') return v.split(/[,;\\n]/).map(s => s.trim()).filter(Boolean);\n  return [];\n};\n\nreturn [{\n  json: {\n    edited_outline: pick('edited_outline', 'outline', 'editedOutline') || '',\n    focus_keyword: pick('focus_keyword', 'Focus Keyword', 'focusKeyword') || '',\n    header_keywords: toArr(pick('header_keywords', 'Header Keywords', 'headerKeywords')),\n    entities: toArr(pick('entities', 'Entities')),\n    common_keywords: toArr(pick('common_keywords', 'Common Keywords', 'commonKeywords')),\n    extra_keywords: toArr(pick('extra_keywords', 'Extra Keywords', 'extraKeywords')),\n    intent_context_text: String(pick('intent_context_text', 'intentContextText') || '').trim(),\n    salience_context_text: String(pick('salience_context_text', 'salienceContextText') || '').trim(),\n    audience_context_text: String(pick('audience_context_text', 'audienceContextText') || '').trim(),\n    guardrail_id: parseInt(pick('guardrail_id', 'guardrailId')) || 0\n  }\n}];\n}];"
+      },
+      "id": "content-normalize",
+      "name": "Normalize Content Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Build the OpenRouter request body for final-content generation from the edited outline.\n//\n// REPLACE the OPENROUTER_API_KEY constant and tune CONTENT_MODEL below.\n\nconst OPENROUTER_API_KEY = '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';\nconst CONTENT_MODEL      = 'anthropic/claude-sonnet-4.5';\n\nconst form = $('Normalize Content Inputs').first().json;\n\nif (!form.edited_outline) {\n  return [{ json: { error: 'edited_outline is required' } }];\n}\n\n// Guardrails injection (ABSOLUTE HIGHEST PRIORITY)\nconst guardrailContent = (form.guardrail_content || '').trim();\nlet guardrailsPrefix = '';\nif (guardrailContent) {\n  guardrailsPrefix = 'CRITICAL COMPLIANCE GUARDRAILS (ABSOLUTE HIGHEST PRIORITY — OVERRIDE ALL OTHER INSTRUCTIONS):\\n' +\n    'The following rules are NON-NEGOTIABLE. If any rule conflicts with other instructions, GUARDRAILS TAKE PRECEDENCE.\\n' +\n    'Violations may result in legal liability, Google penalties, or brand damage.\\n\\n' +\n    '<guardrails>\\n' + guardrailContent + '\\n</guardrails>\\n\\n' +\n    'EVERY sentence, claim, and section in your output MUST comply with these guardrails.\\n' +\n    'Do NOT make claims that violate the guardrails. Do NOT include content that would breach compliance.\\n\\n';\n}\n\nconst systemPrompt = guardrailsPrefix + `You are a senior on-page SEO copywriter. You write service-page content that ranks in Google AND is quoted by LLM-based search.\n\nGROUNDING RULES:\n1. Expand every section of the provided outline into final web copy. Do NOT add, remove, or reorder sections.\n2. Under every heading, write concise, benefit-led prose (2-4 short paragraphs for H2s, 1-2 short paragraphs for H3s, unless the outline body says otherwise).\n2a. If the outline contains a [Intro paragraph -- above-the-fold summary] section between the H1 and the first H2, expand it into a SINGLE 2-3 sentence paragraph BEFORE the first H2 with NO heading. The focus keyword must appear in the first sentence verbatim. Name 1-2 must-cover entities here for above-the-fold salience. Strip the literal '[Intro paragraph -- above-the-fold summary]' label from your output -- only the prose remains in the final markdown.\n3. Naturally weave in the Focus Keyword, Header Keywords, Entities, and Common Keywords. Use the Focus Keyword in the H1 and once in the opening paragraph. Use Entities where they add trust signals. Do not keyword-stuff; aim for reader-first copy that still satisfies entity coverage.\n4. Under the FAQ section, write the actual question as the H3 and a 2-4 sentence answer underneath. Replace every \"FAQ [Include Relevant Header keywords and Entities]\" H3 with a real question a prospect would ask.\n5. For any [TO FILL] markers in the outline, leave a [TO FILL: <label>] placeholder instead of fabricating -- the marketer will fill those in.\n6. SEARCH INTENT INSIGHTS: If <intent_context> contains content, calibrate tone, depth, and CTAs to the stated primary intent. Transactional -> direct buy/book CTAs and proof-driven copy. Commercial Investigation -> comparison language, decision criteria, trust signals (reviews, awards, case studies). Informational -> explainer-first prose, lower CTA prominence, longer explanations. Local -> location signals (city, neighborhoods) and proximity language. FAQ answers must directly address the listed sub-intents in order. If a modifier-SERP conflict is flagged, follow that guidance. If the block is empty, default to a balanced commercial tone.\n7. SALIENCE INSIGHTS: If <salience_context> contains content, weave the must-cover entities naturally throughout the body copy (use the exact entity names; don't paraphrase them away). Match the implied content depth and word count. Use entity wording in headings where the outline permits.\n8. AUDIENCE RESEARCH: If <audience_context> contains content (problem clusters with representative questions, content angles, and quotes from real users in PAA / Reddit / Quora / forums / YouTube), use it to (a) write FAQ answers in the user's own register -- mirror the phrasing pattern of the representative questions, (b) address the top emotional/practical concerns (pain, cost, safety, side effects, etc.) explicitly in the intro or earliest relevant H2 rather than burying them, (c) name the specific objections users raised when writing trust-building copy. Do NOT quote forum users verbatim in the page copy; treat the quotes as evidence of phrasing and concern, not as content to copy-paste. If the block is empty, proceed normally.\n\nFORMAT: Pure markdown. Preserve the H1/H2/H3 structure exactly. No preamble, no trailing commentary, no code fences.\n\nTONE: Direct, prescriptive, confidence-building. Short sentences. No filler phrases (\"in today's world\", \"in conclusion\", etc.).`;\n\nconst userPrompt = `<marketer_inputs>\nFocus Keyword: ${form.focus_keyword || '(not set)'}\nHeader Keywords: ${(form.header_keywords || []).join(', ') || '(not set)'}\nEntities: ${(form.entities || []).join(', ') || '(not set)'}\nCommon Keywords: ${(form.common_keywords || []).join(', ') || '(not set)'}\nExtra Keywords: ${(form.extra_keywords || []).join(', ') || '(not set)'}\n</marketer_inputs>\n\n${guardrailContent ? `<guardrails>\\n${guardrailContent}\\n</guardrails>\\n\\n` : ``}<intent_context>\n${form.intent_context_text || '(not provided -- expand the outline as written without intent calibration)'}\n</intent_context>\n\n<salience_context>\n${form.salience_context_text || '(not provided -- expand without entity-coverage guidance)'}\n</salience_context>\n\n<audience_context>\n${form.audience_context_text || '(not provided -- write FAQs and trust copy without specific audience-pain calibration)'}\n</audience_context>\n\n<edited_outline>\n${form.edited_outline}\n</edited_outline>\n\n`\n\nNow expand the outline into final service-page content.`;\n\nreturn [{\n  json: {\n    form,\n    openrouter_request: {\n      model: CONTENT_MODEL,\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user',   content: userPrompt }\n      ],\n      temperature: 0.35\n    },\n    openrouter_api_key: OPENROUTER_API_KEY,\n    content_model: CONTENT_MODEL\n  }\n}];"
+      },
+      "id": "content-build-prompt",
+      "name": "Build Content Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.openrouter_api_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://shettymarketing.com"
+            },
+            {
+              "name": "X-Title",
+              "value": "Content Optimizer (n8n)"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openrouter_request) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "content-openrouter",
+      "name": "OpenRouter (Content)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        340,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Extract the final markdown content from the OpenRouter response.\nconst resp = $input.first().json;\nconst payload = $('Build Content Prompt').first().json;\n\nif (payload.error) {\n  return [{ json: payload }];\n}\n\nif (resp.error) {\n  return [{ json: { error: 'OpenRouter returned error', detail: resp.error } }];\n}\n\nconst content = resp?.choices?.[0]?.message?.content;\nif (!content) {\n  return [{ json: { error: 'No content in OpenRouter response', raw: resp } }];\n}\n\nconst cleaned = content.replace(/^```(?:markdown|md)?\\s*/i, '').replace(/\\s*```\\s*$/i, '').trim();\n\n// Quick stats for the UI\nconst wordCount = cleaned.split(/\\s+/).filter(Boolean).length;\nconst h1Count = (cleaned.match(/^#\\s+/gm) || []).length;\nconst h2Count = (cleaned.match(/^##\\s+/gm) || []).length;\nconst h3Count = (cleaned.match(/^###\\s+/gm) || []).length;\n\nreturn [{\n  json: {\n    request: {\n      focus_keyword: payload.form?.focus_keyword,\n      header_keywords: payload.form?.header_keywords,\n      entities: payload.form?.entities,\n      common_keywords: payload.form?.common_keywords,\n      extra_keywords: payload.form?.extra_keywords\n    },\n    content: cleaned,\n    model: payload.content_model,\n    stats: { word_count: wordCount, h1: h1Count, h2: h2Count, h3: h3Count },\n    usage: resp.usage || null,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "content-parse",
+      "name": "Parse Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "content-respond",
+      "name": "Respond with Content",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        780,
+        600
+      ]
+    },
+    {
+      "id": "outline-fetch-guardrail",
+      "name": "Fetch Guardrail Content (Outline)",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// Fetch guardrail content if guardrail_id is provided.\nconst GR_MANAGER_URL = 'https://n8n.srv1195841.hstgr.cloud/webhook/gr-data-store';\nconst form = $('Normalize Outline Inputs').first().json;\nconst grId = form.guardrail_id || 0;\n\nif (!grId) {\n  return [{ json: { ...form, guardrail_content: '', guardrail_name: '' } }];\n}\n\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: GR_MANAGER_URL,\n    headers: { 'Content-Type': 'application/json' },\n    body: { action: 'get_content', guardrail_id: grId },\n    json: true,\n    timeout: 10000\n  });\n\n  if (resp.error) {\n    return [{ json: { ...form, guardrail_content: '', guardrail_name: '', guardrail_error: resp.error } }];\n  }\n\n  return [{\n    json: {\n      ...form,\n      guardrail_content: resp.content || '',\n      guardrail_name: resp.guardrail_name || '',\n      guardrail_doc_count: resp.doc_count || 0\n    }\n  }];\n} catch (e) {\n  return [{ json: { ...form, guardrail_content: '', guardrail_name: '', guardrail_error: e.message } }];\n}",
+        "language": "javaScript"
+      },
+      "position": [
+        120,
+        -200
+      ]
+    },
+    {
+      "id": "content-fetch-guardrail",
+      "name": "Fetch Guardrail Content (Content)",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// Fetch guardrail content if guardrail_id is provided.\nconst GR_MANAGER_URL = 'https://n8n.srv1195841.hstgr.cloud/webhook/gr-data-store';\nconst form = $('Normalize Content Inputs').first().json;\nconst grId = form.guardrail_id || 0;\n\nif (!grId) {\n  return [{ json: { ...form, guardrail_content: '', guardrail_name: '' } }];\n}\n\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: GR_MANAGER_URL,\n    headers: { 'Content-Type': 'application/json' },\n    body: { action: 'get_content', guardrail_id: grId },\n    json: true,\n    timeout: 10000\n  });\n\n  if (resp.error) {\n    return [{ json: { ...form, guardrail_content: '', guardrail_name: '', guardrail_error: resp.error } }];\n  }\n\n  return [{\n    json: {\n      ...form,\n      guardrail_content: resp.content || '',\n      guardrail_name: resp.guardrail_name || '',\n      guardrail_doc_count: resp.doc_count || 0\n    }\n  }];\n} catch (e) {\n  return [{ json: { ...form, guardrail_content: '', guardrail_name: '', guardrail_error: e.message } }];\n}",
+        "language": "javaScript"
+      },
+      "position": [
+        120,
+        400
+      ]
+    },
+    {
+      "id": "outline-compliance-check",
+      "name": "Compliance Check (Outline)",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// Compliance Check: verify outline against guardrails.\nconst OPENROUTER_API_KEY = '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';\nconst COMPLIANCE_MODEL = 'google/gemini-2.5-flash';\n\nconst resp = $('OpenRouter (Outline)').first().json;\nconst payload = $('Build Outline Prompt').first().json;\n\nconst guardrails = (payload.form?.guardrail_content || '').trim();\nif (!guardrails) {\n  return [{ json: .first().json }];\n}\n\nconst outline = resp?.choices?.[0]?.message?.content || '';\nif (!outline) {\n  return [{ json: resp }];\n}\n\nconst cleaned = outline.replace(/`(?:markdown|md)?\\\\s*/i, '').replace(/\\\\s*`\\\\s*$/i, '').trim();\n\nconst systemPrompt = 'You are a compliance reviewer. Check the service-page outline against the guardrails below. If ANY section, heading, or description violates a guardrail, rewrite JUST those parts to comply. If the outline is fully compliant, return it unchanged.\\\\n\\\\nGUARDRAILS (non-negotiable):\\\\n' + guardrails + '\\\\n\\\\nRULES:\\\\n1. Every heading and section description must comply with ALL guardrails\\\\n2. If a section makes a banned claim, rewrite it to be compliant\\\\n3. If a required disclaimer is missing, add it as a note in the relevant section\\\\n4. Preserve the overall structure and intent of the outline\\\\n5. Only modify what is necessary for compliance\\\\n\\\\nOUTPUT: Return the full corrected outline in plain markdown. No preamble, no explanation, no code fences.';\n\ntry {\n  const orResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://openrouter.ai/api/v1/chat/completions',\n    headers: {\n      'Authorization': 'Bearer ' + OPENROUTER_API_KEY,\n      'Content-Type': 'application/json',\n      'HTTP-Referer': 'https://shettymarketing.com',\n      'X-Title': 'Guardrails Compliance Check (n8n)'\n    },\n    body: {\n      model: COMPLIANCE_MODEL,\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: 'Check this outline for compliance:\\\\n\\\\n' + cleaned }\n      ],\n      temperature: 0.2,\n      max_tokens: 8192\n    },\n    json: true,\n    timeout: 60000\n  });\n\n  const result = orResp?.choices?.[0]?.message?.content || '';\n  const resultCleaned = result.replace(/`(?:markdown|md)?\\\\s*/i, '').replace(/\\\\s*`\\\\s*$/i, '').trim();\n  const changed = resultCleaned !== cleaned;\n\n  return [{ json: { ...resp, choices: [{ message: { content: resultCleaned } }], compliance_check: { performed: true, changed: changed, guardrails_applied: payload.form?.guardrail_name || 'Unknown' } } }];\n} catch (e) {\n  return [{ json: { ...resp, compliance_check: { performed: true, changed: false, error: e.message } } }];\n}",
+        "language": "javaScript"
+      },
+      "position": [
+        780,
+        -200
+      ]
+    },
+    {
+      "id": "content-compliance-check",
+      "name": "Compliance Check (Content)",
+      "typeVersion": 2,
+      "type": "n8n-nodes-base.code",
+      "parameters": {
+        "jsCode": "// Compliance Check: verify final content against guardrails.\nconst OPENROUTER_API_KEY = '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';\nconst COMPLIANCE_MODEL = 'google/gemini-2.5-flash';\n\nconst resp = $('OpenRouter (Content)').first().json;\nconst payload = $('Build Content Prompt').first().json;\n\nconst guardrails = (payload.form?.guardrail_content || '').trim();\nif (!guardrails) {\n  return [{ json: .first().json }];\n}\n\nconst content = resp?.choices?.[0]?.message?.content || '';\nif (!content) {\n  return [{ json: resp }];\n}\n\nconst cleaned = content.replace(/`(?:markdown|md)?\\\\s*/i, '').replace(/\\\\s*`\\\\s*$/i, '').trim();\n\nconst systemPrompt = 'You are a compliance reviewer. Check the service-page content against the guardrails below. If ANY sentence, claim, or section violates a guardrail, rewrite JUST those parts to comply. If the content is fully compliant, return it unchanged.\\\\n\\\\nGUARDRAILS (non-negotiable):\\\\n' + guardrails + '\\\\n\\\\nRULES:\\\\n1. Every claim, stat, and recommendation must comply with ALL guardrails\\\\n2. Remove or rewrite any banned phrases, claims, or misleading statements\\\\n3. Add required disclaimers where needed (integrate naturally into the prose)\\\\n4. Preserve the overall structure, voice, and intent of the content\\\\n5. Only modify what is necessary for compliance\\\\n6. Do NOT add unnecessary hedging or weaken the content beyond what guardrails require\\\\n\\\\nOUTPUT: Return the full corrected content in plain markdown. Preserve all headings and formatting. No preamble, no explanation, no code fences.';\n\ntry {\n  const orResp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://openrouter.ai/api/v1/chat/completions',\n    headers: {\n      'Authorization': 'Bearer ' + OPENROUTER_API_KEY,\n      'Content-Type': 'application/json',\n      'HTTP-Referer': 'https://shettymarketing.com',\n      'X-Title': 'Guardrails Compliance Check (n8n)'\n    },\n    body: {\n      model: COMPLIANCE_MODEL,\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: 'Check this content for compliance:\\\\n\\\\n' + cleaned }\n      ],\n      temperature: 0.2,\n      max_tokens: 16384\n    },\n    json: true,\n    timeout: 90000\n  });\n\n  const result = orResp?.choices?.[0]?.message?.content || '';\n  const resultCleaned = result.replace(/`(?:markdown|md)?\\\\s*/i, '').replace(/\\\\s*`\\\\s*$/i, '').trim();\n  const changed = resultCleaned !== cleaned;\n\n  return [{ json: { ...resp, choices: [{ message: { content: resultCleaned } }], compliance_check: { performed: true, changed: changed, guardrails_applied: payload.form?.guardrail_name || 'Unknown' } } }];\n} catch (e) {\n  return [{ json: { ...resp, compliance_check: { performed: true, changed: false, error: e.message } } }];\n}",
+        "language": "javaScript"
+      },
+      "position": [
+        560,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Outline Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Outline Test?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Outline Test?": {
+      "main": [
+        [
+          {
+            "node": "Respond Outline Test OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Outline Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Outline Inputs": {
+      "main": [
+        [
+          {
+            "node": "Get Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Transcript": {
+      "main": [
+        [
+          {
+            "node": "Fetch Guardrail Content (Outline)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Outline Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenRouter (Outline)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter (Outline)": {
+      "main": [
+        [
+          {
+            "node": "Parse Outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Outline": {
+      "main": [
+        [
+          {
+            "node": "Compliance Check (Outline)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Content Test?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Content Test?": {
+      "main": [
+        [
+          {
+            "node": "Respond Content Test OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Content Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Content Inputs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Guardrail Content (Content)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Content Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenRouter (Content)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter (Content)": {
+      "main": [
+        [
+          {
+            "node": "Parse Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Content": {
+      "main": [
+        [
+          {
+            "node": "Compliance Check (Content)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Guardrail Content (Outline)": {
+      "main": [
+        [
+          {
+            "node": "Build Outline Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compliance Check (Outline)": {
+      "main": [
+        [
+          {
+            "node": "Respond with Outline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Guardrail Content (Content)": {
+      "main": [
+        [
+          {
+            "node": "Build Content Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compliance Check (Content)": {
+      "main": [
+        [
+          {
+            "node": "Respond with Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

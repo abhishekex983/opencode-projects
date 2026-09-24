@@ -1,0 +1,161 @@
+Format: Portrait (2:3 ratio), Pinterest-optimized
+
+Objective:
+Create a high-converting Pinterest pin showing a before/after comparison. The design should feel like a premium editorial healthcare spread with clear visual contrast between "before" and "after" states.
+
+Content Source:
+Use information, key insights, and images from the referenced blog post.
+
+Brand Identity:
+Use colors and typography from the provided brand kit:
+{F:\Opencode Projects\Social Media Posts-Image Generator\Pinterest\Thin Hair Growth Guide Brand Colors.txt}
+
+Audience: Male
+- Tone: Direct, bold, no fluff
+- Visual: Sharp geometry, strong contrast
+- Colors: Cool/neutral tones
+- Messaging: Empowering, solution-focused
+
+Visual Style & Aesthetic:
+
+Premium editorial healthcare magazine style with comparison layout.
+
+Inspiration:
+- Men's Health transformation spreads
+- Forbes Health before/after features
+- Luxury skincare brand comparisons
+- Modern medical publication layouts
+
+Design Requirements:
+
+Layout Structure:
+┌─────────────────────────────────┐
+│  HEADLINE (top, full width)     │
+│  "Before vs After: [Topic]"    │
+├─────────────────┬───────────────┤
+│                 │               │
+│    BEFORE       │    AFTER      │
+│    (left)       │    (right)    │
+│                 │               │
+├─────────────────┴───────────────┤
+│  KEY INSIGHT / CTA             │
+│  (bottom, full width)          │
+└─────────────────────────────────┘
+
+- Large curiosity-driven headline at the top
+- Split comparison layout (left/right or top/bottom)
+- Clear "BEFORE" and "AFTER" labels
+- Strong visual hierarchy:
+    1. Attention-grabbing headline
+    2. Comparison images
+    3. Supporting insight or CTA
+
+- Clean premium layout
+- Plenty of whitespace between comparison sides
+- Modern typography
+- Professional medical trust aesthetic
+- Sophisticated and authoritative
+- Designed for Pinterest scrolling behavior
+
+Typography:
+
+- Bold headline typography
+- "BEFORE" / "AFTER" labels: uppercase, bold, dark navy
+- Maximum readability on mobile screens
+- Use short, powerful phrases
+- No small unreadable text
+- All text must be perfectly spelled and grammatically correct
+
+Color Direction:
+
+- Follow brand kit colors
+- Use subtle medical/wellness tones
+- Avoid overly bright marketing colors
+- Maintain premium brand consistency
+- BEFORE side: slightly muted/desaturated tones
+- AFTER side: vibrant, healthy tones
+
+Visual Elements:
+
+Include:
+- Provided comparison images (before/after)
+- Subtle divider line between comparison sides
+- Minimal geometric shapes or lines
+- Clear labeling for each side
+
+Avoid:
+- Generic stock transformation layouts
+- Excessive icons
+- Cartoon illustrations
+- Cluttered information blocks
+- Fake statistics
+- AI-generated text inside images
+- Overly dramatic filters
+
+Text Rules:
+
+The generated image must contain only:
+- Main headline ("Before vs After: [Topic]" or similar)
+- "BEFORE" label on left/top
+- "AFTER" label on right/bottom
+- Short insight or CTA at bottom (optional)
+
+Do NOT add paragraphs or unnecessary text.
+
+## Logo Requirement (STRICT)
+
+Use ONLY the official Thin Hair Growth Guide logo. Do NOT generate or invent a logo.
+
+Logo files:
+- Light backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide logo.png
+- Dark backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide ( White logo).png
+
+Placement: Bottom-right corner, approximately 8-10% of image width.
+Maintain clear padding from edges.
+
+## Kie.ai API Configuration
+
+Endpoint: POST https://api.kie.ai/api/v1/jobs/createTask
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+
+Model: gpt-image-2-image-to-image
+
+Request Format (parameters go inside 'input' object):
+{
+  "model": "gpt-image-2-image-to-image",
+  "callBackUrl": "https://webhook.site/...",
+  "input": {
+    "prompt": "<your prompt here>",
+    "input_urls": ["<before image URL>", "<after image URL>"],
+    "aspect_ratio": "2:3",
+    "resolution": "2K"
+  }
+}
+
+Polling (check task status):
+GET https://api.kie.ai/api/v1/jobs/recordInfo?taskId={taskId}
+
+Response format:
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "state": "success",
+    "resultJson": "{\"resultUrls\":[\"https://...\"]}"
+  }
+}
+
+References:
+
+Blog article:
+{Add blog URL}
+
+Brand kit:
+{Add brand kit URL}
+
+Blog images:
+Use before/after images from blog post. If only one image available, use it as reference and generate conceptual comparison.
+
+Final Output:
+A premium Pinterest pin with clear before/after comparison, optimized for clicks, trust, and brand recognition.

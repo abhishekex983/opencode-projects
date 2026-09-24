@@ -1,0 +1,109 @@
+{
+  "name": "Media Library Manager",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ml-manager",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-1",
+      "name": "Media Lib Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [460, 300],
+      "typeVersion": 2,
+      "webhookId": "ml-manager"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const staticData = $getWorkflowStaticData('global');\nif (!staticData.media_collections) staticData.media_collections = [];\nif (!staticData.media_items) staticData.media_items = [];\nif (!staticData.next_collection_id) staticData.next_collection_id = 1;\nif (!staticData.next_item_id) staticData.next_item_id = 1;\n\nconst input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\nconst action = body.action || 'ping';\n\nfunction now() { return new Date().toISOString(); }\n\nfunction extractAltFromUrl(url) {\n  try {\n    var filename;\n    try {\n      filename = new URL(url).pathname.split('/').pop();\n    } catch (e) {\n      var parts = url.split('/');\n      filename = parts[parts.length - 1] || '';\n    }\n    var name = filename.replace(/\\.[^.]+$/, '');\n    return name.replace(/[-_]+/g, ' ').replace(/\\b\\w/g, function(c) { return c.toUpperCase(); });\n  } catch (e) { return ''; }\n}\n\nfunction detectMediaType(url) {\n  if (/youtube\\.com\\/watch|youtu\\.be\\//i.test(url)) return 'youtube';\n  return 'image';\n}\n\nfunction isValidUrl(str) {\n  try { new URL(str); return true; } catch (e) { return /^https?:\\/\\/.+/i.test(str); }\n}\n\nlet result = {};\n\nswitch (action) {\n  case 'ping':\n    result = { ok: true, message: 'Media Library webhook reachable', received_at: now() };\n    break;\n\n  case 'create_collection': {\n    const name = (body.name || '').trim();\n    if (!name) { result = { error: 'Collection name is required.' }; break; }\n    const col = {\n      id: staticData.next_collection_id++,\n      name: name,\n      description: (body.description || '').trim(),\n      created_at: now()\n    };\n    staticData.media_collections.push(col);\n    result = { ok: true, collection: col };\n    break;\n  }\n\n  case 'list_collections': {\n    const cols = staticData.media_collections.map(function(col) {\n      const itemCount = staticData.media_items.filter(function(i) { return i.collection_id === col.id; }).length;\n      return { id: col.id, name: col.name, description: col.description, created_at: col.created_at, item_count: itemCount };\n    });\n    result = { collections: cols };\n    break;\n  }\n\n  case 'delete_collection': {\n    const colId = parseInt(body.collection_id);\n    if (!colId) { result = { error: 'collection_id is required.' }; break; }\n    const idx = staticData.media_collections.findIndex(function(c) { return c.id === colId; });\n    if (idx === -1) { result = { error: 'Collection not found.' }; break; }\n    staticData.media_collections.splice(idx, 1);\n    staticData.media_items = staticData.media_items.filter(function(i) { return i.collection_id !== colId; });\n    result = { ok: true };\n    break;\n  }\n\n  case 'add_items': {\n    const colId = parseInt(body.collection_id);\n    if (!colId) { result = { error: 'collection_id is required.' }; break; }\n    const col = staticData.media_collections.find(function(c) { return c.id === colId; });\n    if (!col) { result = { error: 'Collection not found.' }; break; }\n    const urls = body.urls;\n    if (!Array.isArray(urls) || urls.length === 0) { result = { error: 'urls array is required and must not be empty.' }; break; }\n    const added = [];\n    const errors = [];\n    for (let i = 0; i < urls.length; i++) {\n      const entry = urls[i];\n      const url = (typeof entry === 'string') ? entry.trim() : (entry.url || '').trim();\n      if (!url) { errors.push('Empty URL at position ' + (i + 1)); continue; }\n      if (!isValidUrl(url)) { errors.push('Invalid URL: ' + url); continue; }\n      const item = {\n        id: staticData.next_item_id++,\n        collection_id: colId,\n        url: url,\n        alt_text: (typeof entry === 'object' && entry.alt_text) ? entry.alt_text.trim() : extractAltFromUrl(url),\n        media_type: (typeof entry === 'object' && entry.media_type) ? entry.media_type.trim() : detectMediaType(url),\n        created_at: now()\n      };\n      staticData.media_items.push(item);\n      added.push(item);\n    }\n    result = { ok: true, added_count: added.length, items: added, errors: errors.length ? errors : undefined };\n    break;\n  }\n\n  case 'list_items': {\n    const colId = parseInt(body.collection_id);\n    if (!colId) { result = { error: 'collection_id is required.' }; break; }\n    const items = staticData.media_items.filter(function(i) { return i.collection_id === colId; });\n    result = { items: items };\n    break;\n  }\n\n  case 'delete_item': {\n    const colId = parseInt(body.collection_id);\n    const itemId = parseInt(body.item_id);\n    if (!colId || !itemId) { result = { error: 'collection_id and item_id are required.' }; break; }\n    const idx = staticData.media_items.findIndex(function(i) { return i.id === itemId && i.collection_id === colId; });\n    if (idx === -1) { result = { error: 'Item not found.' }; break; }\n    staticData.media_items.splice(idx, 1);\n    result = { ok: true };\n    break;\n  }\n\n  default:\n    result = { error: 'Unknown action: ' + action };\n}\n\nreturn [{ json: result }];"
+      },
+      "id": "code-1",
+      "name": "Media Lib Logic",
+      "type": "n8n-nodes-base.code",
+      "position": [700, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-1",
+      "name": "Respond with JSON",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [940, 300],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "position": [460, 500],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 500
+        },
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "error-respond",
+      "name": "Respond with Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [700, 500],
+      "typeVersion": 1
+    }
+  ],
+  "connections": {
+    "Media Lib Webhook": {
+      "main": [
+        [
+          {
+            "node": "Media Lib Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Media Lib Logic": {
+      "main": [
+        [
+          {
+            "node": "Respond with JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Respond with Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0
+}

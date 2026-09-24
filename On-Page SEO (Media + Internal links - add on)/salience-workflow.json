@@ -1,0 +1,218 @@
+{
+  "name": "Salience Score",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Salience Score\n\n**Flow:**\n1. Webhook accepts `{ focus_entity, language, content_type, content }`. content_type is `PLAIN_TEXT` or `HTML`.\n2. Normalize Input + Build NLP Request.\n3. Google Cloud Natural Language API `documents:analyzeEntities` (V1 endpoint -- V2 dropped salience scores) returns entities with salience (0-1) and mention offsets.\n4. Compute Features (Code node): focus-entity match (token-aware, catches acronyms like CPM/AED/CPR), position signals, n-grams (bigrams + trigrams), rule-based recommendations.\n5. AI Suggestions (Code node): sends the deterministic output + a plain-text excerpt to OpenRouter (Gemini 2.5 Flash) which returns structured strategy -- keywords to double down on / add / reduce, topics to expand / trim, structural moves with impact, predicted lift estimate. Fails gracefully if OpenRouter is unreachable.\n6. Respond.\n\n**Before running:**\n1. **Enable** the Cloud Natural Language API on the same Google Cloud project that hosts your Knowledge Graph API key (https://console.cloud.google.com/apis/library/language.googleapis.com). Free tier: 5K units/month.\n2. The Google NLP HTTP node uses the same KG API key by default - swap the key in the URL if you want a separate one.\n3. Activate the workflow and copy the Production URL into the on-page-app frontend.\n\n**Output JSON shape:**\n```\n{\n  focus_entity, focus_salience, focus_strength_label,\n  is_top_entity, actual_top_entity,\n  position_signals: { in_h1, in_h2_count, in_h3_count, in_first_sentence, first_mention_offset, total_mentions },\n  stats: { word_count, char_count, headings },\n  entities: [...],\n  ngrams: { bigrams: [...], trigrams: [...] },\n  recommendations: [...]\n}\n```\n\n**Resilience:** Google NLP node has `neverError: true` + `onError: continueRegularOutput`. API errors return as `{ error: ... }` in the response - the webhook always returns valid JSON.",
+        "height": 540,
+        "width": 420
+      },
+      "id": "9bd91ad2-1b6e-46e3-8e6f-1c4cfc24e891",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "salience",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "1f0e8b9a-3b2a-4d1c-8f7e-a8c9d4b2e7f1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 480],
+      "webhookId": "salience-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond-sal",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2c1d5b6e-4a8f-4e2b-9c3d-b7e6f1a4c5d8",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [400, 480]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Salience webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "3a7f9c1b-5e2d-4c6a-b8f3-d9e2c4b6a1f5",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [608, 608]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\n\nconst content = String(body.content || '');\nif (!content.trim()) throw new Error('content is required');\n\nlet contentType = String(body.content_type || body.contentType || 'PLAIN_TEXT').toUpperCase();\nif (contentType !== 'PLAIN_TEXT' && contentType !== 'HTML') contentType = 'PLAIN_TEXT';\n\nreturn [{\n  json: {\n    focus_entity: String(body.focus_entity || body.focusEntity || '').trim(),\n    language: String(body.language || 'en').trim(),\n    content_type: contentType,\n    content,\n    requested_at: body.requested_at || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "4b8d0a2c-6f3e-4d7b-9a5c-c8e1d3b5a2e6",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [608, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nreturn [{\n  json: {\n    ...input,\n    nlp_request: {\n      document: {\n        type: input.content_type,\n        language: input.language,\n        content: input.content\n      },\n      encodingType: 'UTF8'\n    }\n  }\n}];"
+      },
+      "id": "5c9e1b3d-7a4f-4e8c-ab6d-d9f2e4c6b3a7",
+      "name": "Build NLP Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 368]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://language.googleapis.com/v1/documents:analyzeEntities?key=AIzaSyC4Ci8SOlsGhjI6PP9x7z1sp8Jj7eobM2s",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.nlp_request) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "6d0f2c4e-8b5a-4f9d-bc7e-e1a3b5c7d4f8",
+      "name": "Google NLP analyzeEntities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1008, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $('Normalize Input').first().json;\nconst nlp = $input.first().json;\n\nif (nlp && nlp.error) {\n  return [{ json: { error: 'Google NLP error: ' + (nlp.error.message || nlp.error.code || 'unknown'), detail: nlp.error } }];\n}\n\nconst entities = Array.isArray(nlp && nlp.entities) ? nlp.entities : [];\n\nconst focus = (inputs.focus_entity || '').trim();\nconst focusLower = focus.toLowerCase();\nconst focusTokens = focusLower.split(/\\s+/).filter(t => t.length > 1);\nconst focusTokenSet = new Set(focusTokens);\n\nconst STOP = new Set(('a an and or but if then else for of in to with on at by from as is are was were be been being have has had do does did can could should would will may might must this that these those it its their them they we us our you your he she his her i me my him not no so too very just also more most some any all each every other'.split(/\\s+/)));\n\nconst isHtml = inputs.content_type === 'HTML';\nconst rawContent = inputs.content || '';\n\nfunction decodeEntities(s) {\n  return s.replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\");\n}\nconst plainText = isHtml\n  ? decodeEntities(rawContent.replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ').replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim())\n  : rawContent;\n\nfunction extractTags(html, tag) {\n  const re = new RegExp('<' + tag + '\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/' + tag + '>', 'gi');\n  const out = [];\n  let m;\n  while ((m = re.exec(html)) !== null) {\n    out.push(decodeEntities(m[1].replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim()));\n  }\n  return out;\n}\nconst h1List = isHtml ? extractTags(rawContent, 'h1') : [];\nconst h2List = isHtml ? extractTags(rawContent, 'h2') : [];\nconst h3List = isHtml ? extractTags(rawContent, 'h3') : [];\n\nfunction containsFocus(text) {\n  if (!text || !focusLower) return false;\n  const lower = text.toLowerCase();\n  if (lower.includes(focusLower)) return true;\n  if (focusTokens.length >= 2 && focusTokens.every(t => lower.includes(t))) return true;\n  return false;\n}\n\nconst inH1 = h1List.some(containsFocus);\nconst inH2Count = h2List.filter(containsFocus).length;\nconst inH3Count = h3List.filter(containsFocus).length;\n\nconst firstSentence = (plainText.split(/(?<=[.!?])\\s+/)[0] || '').slice(0, 400);\nconst inFirstSentence = containsFocus(firstSentence);\n\nfunction entityMatchesFocus(e) {\n  const n = (e.name || '').toLowerCase();\n  if (!n || !focusLower) return false;\n  if (n === focusLower) return true;\n  if (n.includes(focusLower)) return true;\n  const focusTokensArr = focusLower.split(/\\s+/);\n  if (n.length >= 3 && focusTokensArr.includes(n)) return true;\n  if (focusTokens.length >= 2) {\n    const nTokens = n.split(/\\s+/);\n    const overlap = focusTokens.filter(t => nTokens.includes(t)).length;\n    if (overlap / focusTokens.length >= 0.7) return true;\n  }\n  return false;\n}\n\nconst focusEntities = entities.filter(entityMatchesFocus);\nconst focusSalience = focusEntities.reduce((s, e) => s + (Number(e.salience) || 0), 0);\nconst focusMentions = focusEntities.reduce((s, e) => s + ((e.mentions || []).length), 0);\nconst firstMentionOffsets = focusEntities.flatMap(e => (e.mentions || []).map(m => (m.text && Number(m.text.beginOffset)) || Infinity));\nconst firstMentionOffset = firstMentionOffsets.length ? Math.min(...firstMentionOffsets) : null;\n\nconst sortedEntities = [...entities].sort((a, b) => (Number(b.salience) || 0) - (Number(a.salience) || 0));\nconst topEntity = sortedEntities[0] || null;\nconst isTopEntity = !!(topEntity && entityMatchesFocus(topEntity));\n\nconst enrichedEntities = sortedEntities.map(e => ({\n  name: e.name,\n  type: e.type,\n  salience: Number(e.salience) || 0,\n  mentions: (e.mentions || []).length,\n  wikipedia_url: (e.metadata && e.metadata.wikipedia_url) || null,\n  is_focus: entityMatchesFocus(e)\n}));\n\nfunction tokenizeForNgrams(t) {\n  return t.toLowerCase()\n    .replace(/[^a-z0-9\\s'-]/g, ' ')\n    .split(/\\s+/)\n    .filter(w => w && !STOP.has(w) && w.length > 1);\n}\nfunction buildNgrams(tokens, n) {\n  const counts = new Map();\n  for (let i = 0; i <= tokens.length - n; i++) {\n    const phrase = tokens.slice(i, i + n).join(' ');\n    counts.set(phrase, (counts.get(phrase) || 0) + 1);\n  }\n  return [...counts.entries()]\n    .filter(([_, c]) => c >= 2)\n    .sort((a, b) => b[1] - a[1])\n    .map(([phrase, count]) => ({\n      phrase,\n      count,\n      contains_focus: focusTokens.some(t => phrase.split(' ').includes(t))\n    }))\n    .slice(0, 20);\n}\nconst ngramTokens = tokenizeForNgrams(plainText);\nconst bigrams = buildNgrams(ngramTokens, 2);\nconst trigrams = buildNgrams(ngramTokens, 3);\n\nconst wordCount = plainText.split(/\\s+/).filter(Boolean).length;\nconst charCount = (inputs.content || '').length;\n\nconst recs = [];\nif (focusSalience >= 0.40) recs.push({ type: 'ok', text: 'Focus is dominant (' + focusSalience.toFixed(2) + ') -- Google reads this content as deeply about your topic.' });\nelse if (focusSalience >= 0.25) recs.push({ type: 'ok', text: 'Focus salience is solid (' + focusSalience.toFixed(2) + '). A few tweaks could push it to dominant.' });\nelse if (focusSalience >= 0.10) recs.push({ type: 'improve', text: 'Focus salience is moderate (' + focusSalience.toFixed(2) + '). Tighten the topic by trimming off-topic sections and adding more mentions.' });\nelse recs.push({ type: 'critical', text: 'Focus salience is weak (' + focusSalience.toFixed(2) + '). The focus is buried as a tangential detail.' });\n\nif (!isTopEntity && topEntity) {\n  recs.push({ type: 'critical', text: 'The #1 entity is \"' + topEntity.name + '\" (salience ' + (Number(topEntity.salience) || 0).toFixed(2) + '). Either pivot the page toward your focus, or rename the focus to what the content actually centres on.' });\n} else if (isTopEntity) {\n  recs.push({ type: 'ok', text: 'Your focus is the #1 entity in the document.' });\n}\n\nif (isHtml) {\n  if (!inH1) recs.push({ type: 'improve', text: 'Add your focus entity to the H1.' });\n  else recs.push({ type: 'ok', text: 'Focus is in the H1.' });\n  if (h2List.length > 0 && inH2Count === 0) recs.push({ type: 'improve', text: 'Mention the focus (or a close variant) in at least one H2 -- currently in 0 of ' + h2List.length + '.' });\n  else if (inH2Count > 0) recs.push({ type: 'ok', text: 'Focus appears in ' + inH2Count + ' of ' + h2List.length + ' H2 headings.' });\n} else {\n  recs.push({ type: 'improve', text: 'Pasted as plain text -- to get heading-level position signals, paste the HTML source instead and toggle the editor to HTML mode.' });\n}\n\nif (!inFirstSentence) recs.push({ type: 'improve', text: 'Move the focus into the first sentence of the article -- Google weights early-position tokens higher.' });\nelse recs.push({ type: 'ok', text: 'Focus is in the first sentence.' });\n\nif (focusMentions === 0) recs.push({ type: 'critical', text: 'Google did not detect your focus as an entity at all. Check spelling, or use the canonical phrasing of the topic.' });\nelse if (focusMentions < 3) recs.push({ type: 'improve', text: 'Only ' + focusMentions + ' mention(s) of the focus entity detected. Aim for 5-10 natural mentions throughout the body.' });\n\nconst strengthLabel = focusSalience >= 0.40 ? 'Dominant' : focusSalience >= 0.25 ? 'Strong' : focusSalience >= 0.10 ? 'Moderate' : 'Weak';\n\nreturn [{\n  json: {\n    focus_entity: focus,\n    focus_salience: focusSalience,\n    focus_strength_label: strengthLabel,\n    is_top_entity: isTopEntity,\n    actual_top_entity: isTopEntity ? null : (topEntity ? { name: topEntity.name, salience: Number(topEntity.salience) || 0, type: topEntity.type } : null),\n    position_signals: {\n      in_h1: inH1,\n      in_h2_count: inH2Count,\n      in_h3_count: inH3Count,\n      in_first_sentence: inFirstSentence,\n      first_mention_offset: firstMentionOffset === Infinity ? null : firstMentionOffset,\n      total_mentions: focusMentions\n    },\n    stats: {\n      word_count: wordCount,\n      char_count: charCount,\n      headings: { h1: h1List.length, h2: h2List.length, h3: h3List.length }\n    },\n    entities: enrichedEntities.slice(0, 25),\n    ngrams: { bigrams, trigrams },\n    recommendations: recs,\n    request: { focus_entity: focus, language: inputs.language, content_type: inputs.content_type },\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "7e1a3b5c-9c6e-4ab0-bd8f-f2b4c6d8e5a9",
+      "name": "Compute Features",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 368]
+    },
+    {
+      "parameters": {
+        "jsCode": "// AI Strategy layer -- interprets the deterministic salience output and produces actionable\n// keyword + topic + structural suggestions via OpenRouter (Gemini 2.5 Flash).\n// Fails gracefully: if OpenRouter is unreachable or returns malformed JSON, ai_suggestions=null\n// and the rest of the response is unchanged.\n\nconst OPENROUTER_API_KEY = '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';\nconst AI_MODEL = 'google/gemini-2.5-pro';\n\nconst upstream = $input.first().json;\nconst inputs = $('Normalize Input').first().json;\n\nif (upstream.error) {\n  return [{ json: upstream }];\n}\n\n// Plain-text excerpt to ground the model in the actual content (not just signals).\nconst rawContent = inputs.content || '';\nconst plainText = rawContent\n  .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')\n  .replace(/\\s+/g, ' ').trim();\nconst excerpt = plainText.slice(0, 800);\n\nconst entities = (upstream.entities || []).slice(0, 15);\nconst bigrams = (upstream.ngrams && upstream.ngrams.bigrams) || [];\nconst trigrams = (upstream.ngrams && upstream.ngrams.trigrams) || [];\nconst recs = upstream.recommendations || [];\nconst actualTop = upstream.actual_top_entity;\n\nconst systemPrompt = [\n  \"You are a senior on-page SEO strategist analyzing a Google Cloud NLP salience audit. The user wants concrete, actionable guidance to lift the salience score of their focus entity -- so Google's NLP reads the page as being about the RIGHT topic.\",\n  '',\n  'GROUNDING RULES (non-negotiable):',\n  '1. Base EVERY suggestion on the data in <signals>. Do not invent entities, n-grams, sub-topics, or facts that are not present.',\n  '2. When you reference an entity or n-gram, use its EXACT wording from the data.',\n  '3. Distinguish keywords/phrases (specific wording to add/cut) from topics (subjects to expand or trim).',\n  '4. Every structural move must cite a position signal (no H1 hit, missing from first sentence, only N H2 mentions, focus not the top entity, etc.).',\n  '5. Be honest about predicted lift. If the focus is buried (salience < 0.10) and the top entity is unrelated, recommend a CONTENT PIVOT, not cosmetic changes.',\n  '6. Keep suggestions SEO-actionable. No fluff, no hedging (\"consider\", \"might\"). Use imperatives.',\n  '',\n  'OUTPUT: JSON only. No prose, no markdown fences. Schema EXACTLY:',\n  '{',\n  '  \"summary\": \"1-2 sentence diagnosis of the salience situation\",',\n  '  \"keyword_strategy\": {',\n  '    \"double_down\": [ { \"phrase\": \"exact wording from data\", \"where\": \"H1|intro|sections|FAQ\", \"why\": \"1 sentence\" } ],',\n  '    \"add\": [ { \"phrase\": \"new phrase not yet in data\", \"why\": \"1 sentence\" } ],',\n  '    \"reduce\": [ { \"phrase\": \"competing entity from data\", \"why\": \"1 sentence -- why it dilutes focus\" } ]',\n  '  },',\n  '  \"topic_strategy\": {',\n  '    \"expand\": [ { \"topic\": \"topic name\", \"why\": \"1 sentence\" } ],',\n  '    \"trim\": [ { \"topic\": \"topic name\", \"why\": \"1 sentence\" } ]',\n  '  },',\n  '  \"structural_moves\": [',\n  '    { \"action\": \"imperative instruction\", \"impact\": \"high|medium|low\", \"rationale\": \"ties to a specific position signal\" }',\n  '  ],',\n  '  \"predicted_lift\": \"1 sentence with numeric estimate range (e.g. Expect salience to lift from 0.05 to 0.35-0.45 after these changes.)\"',\n  '}',\n  '',\n  'Each array can have 0-5 items. Omit array items when nothing meaningful applies. Keep arrays short and high-signal.'\n].join('\\n');\n\nconst userPrompt = [\n  'FOCUS ENTITY: ' + upstream.focus_entity,\n  'CURRENT FOCUS SALIENCE: ' + upstream.focus_salience.toFixed(3) + ' (' + upstream.focus_strength_label + ')',\n  'IS FOCUS THE TOP ENTITY: ' + upstream.is_top_entity,\n  actualTop ? ('ACTUAL TOP ENTITY: ' + actualTop.name + ' (salience ' + Number(actualTop.salience).toFixed(3) + ', type ' + actualTop.type + ')') : '',\n  '',\n  '<signals>',\n  'POSITION SIGNALS:',\n  JSON.stringify(upstream.position_signals, null, 2),\n  '',\n  'STATS:',\n  JSON.stringify(upstream.stats, null, 2),\n  '',\n  'TOP ENTITIES (from Google NLP, sorted by salience):',\n  JSON.stringify(entities, null, 2),\n  '',\n  'TOP BIGRAMS: ' + bigrams.slice(0, 12).map(b => b.phrase + ' (' + b.count + ')').join(', '),\n  'TOP TRIGRAMS: ' + trigrams.slice(0, 8).map(t => t.phrase + ' (' + t.count + ')').join(', '),\n  '',\n  'RULE-BASED RECOMMENDATIONS (already shown to user):',\n  recs.map(r => '- [' + (r.type || '') + '] ' + r.text).join('\\n'),\n  '</signals>',\n  '',\n  'CONTENT EXCERPT (first 800 chars of plain text from the page):',\n  '\"' + excerpt + '\"' + (plainText.length > 800 ? ' ...[truncated]' : ''),\n  '',\n  'Return your AI Strategy as JSON.'\n].filter(Boolean).join('\\n');\n\ntry {\n  const resp = await this.helpers.httpRequest({\n    method: 'POST',\n    url: 'https://openrouter.ai/api/v1/chat/completions',\n    headers: {\n      'Authorization': 'Bearer ' + OPENROUTER_API_KEY,\n      'Content-Type': 'application/json',\n      'HTTP-Referer': 'https://shettymarketing.local/on-page-seo',\n      'X-Title': 'On-Page SEO :: Salience Score AI Strategy'\n    },\n    body: {\n      model: AI_MODEL,\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user',   content: userPrompt }\n      ],\n      temperature: 0.25,\n      response_format: { type: 'json_object' }\n    },\n    json: true,\n    timeout: 45000\n  });\n\n  const text = resp && resp.choices && resp.choices[0] && resp.choices[0].message && resp.choices[0].message.content;\n  if (!text) {\n    upstream.ai_suggestions = null;\n    upstream.ai_suggestions_error = 'No content in OpenRouter response';\n  } else {\n    let parsed;\n    try {\n      parsed = JSON.parse(text);\n    } catch (e) {\n      const cleaned = text.replace(/^```json\\s*/i, '').replace(/```\\s*$/, '').trim();\n      try { parsed = JSON.parse(cleaned); } catch (e2) {\n        upstream.ai_suggestions = null;\n        upstream.ai_suggestions_error = 'Failed to parse JSON from model';\n        upstream.ai_suggestions_raw = text;\n        return [{ json: upstream }];\n      }\n    }\n    upstream.ai_suggestions = parsed;\n    upstream.ai_model = AI_MODEL;\n  }\n} catch (err) {\n  upstream.ai_suggestions = null;\n  upstream.ai_suggestions_error = String(err && err.message ? err.message : err);\n}\n\nreturn [{ json: upstream }];"
+      },
+      "id": "ad9b1e3c-bf5d-4ce6-af7b-c0d8e9f1a2b4",
+      "name": "AI Suggestions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 368],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "8f2b4c6d-ad7f-4bc1-ce90-a3c5d7e9f6ba",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1600, 368]
+    },
+    {
+      "parameters": {
+        "content": "## How the analysis works\n\n**Google NLP (analyzeEntities)** returns entities with a 0-1 salience score that sums to ~1 across the document. That score reflects entity centrality based on position, frequency, and contextual relationships -- exactly the factors described in the Google docs.\n\n**Focus matching** is fuzzy: exact name match, substring match, or 70%+ token overlap. If Google split your focus into multiple entities (e.g. 'first aid' and 'certification'), their salience is summed.\n\n**Position signals** come from:\n- HTML mode: regex extraction of `<h1>`, `<h2>`, `<h3>` text + check focus presence.\n- Plain mode: first-sentence detection only (use HTML mode for heading signals).\n- Both: first mention offset (from NLP `mentions[].text.beginOffset`).\n\n**N-grams** are computed locally from cleaned plaintext, stop-word-filtered, min-count 2.\n\n**Recommendations** are deterministic rules over the above signals -- no LLM call needed.",
+        "height": 360,
+        "width": 380,
+        "color": 5
+      },
+      "id": "9a3c5d7e-be8a-4cd2-df01-b4d6e8f0a7cb",
+      "name": "Analysis Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1200, -40]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Is Test?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Test?": {
+      "main": [
+        [{ "node": "Respond Test OK", "type": "main", "index": 0 }],
+        [{ "node": "Normalize Input", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [{ "node": "Build NLP Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build NLP Request": {
+      "main": [
+        [{ "node": "Google NLP analyzeEntities", "type": "main", "index": 0 }]
+      ]
+    },
+    "Google NLP analyzeEntities": {
+      "main": [
+        [{ "node": "Compute Features", "type": "main", "index": 0 }]
+      ]
+    },
+    "Compute Features": {
+      "main": [
+        [{ "node": "AI Suggestions", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Suggestions": {
+      "main": [
+        [{ "node": "Respond with Results", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {},
+  "tags": []
+}

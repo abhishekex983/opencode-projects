@@ -1,0 +1,524 @@
+{
+  "name": "Entity Presence -- Report Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Entity Presence -- Report Generator\n\n**Flow:**\n1. Form / Webhook collects search term + target business (+ optional NeuronWriter creds)\n2. KG API resolves the target entity\n3. Places API (New) pulls live GBP data\n4. DataForSEO returns the SERP\n5. **NeuronWriter Enrichment** (add-on) -- pulls headings/terms/entities if creds provided, else no-op\n6. Code node prunes + builds the Gemini payload\n7. Gemini 2.5 Flash returns a JSON action plan (with content_suggestions when NEURON is active)\n8. Code node parses the JSON for downstream use\n\n**Before running:**\n- Confirm the KG, Places, and Gemini API keys on each HTTP node.\n- On the `DataForSEO SERP` node: select your n8n **HTTP Basic Auth** credential (email = username, DataForSEO API key = password).\n- For the Webhook trigger: activate the workflow and copy the Production URL into `on-page-app.html`.\n\n**NeuronWriter add-on:**\n- Users who don't have NeuronWriter just leave the fields blank -- the enrichment node returns `{neuronwriter: null, neuronwriter_status: 'disabled'}` and the pipeline continues.\n- When enabled, a single run takes ~60-180s longer because NeuronWriter's analysis runs asynchronously and we poll until `status=='ready'`.",
+        "height": 540,
+        "width": 400
+      },
+      "id": "sticky-overview",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Ranking Report Request",
+        "formDescription": "Generate an actionable ranking plan for a business + search term.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Search Term",
+              "fieldName": "search_term",
+              "placeholder": "pediatric dentist austin",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Location (DataForSEO format, e.g. 'Austin,Texas,United States')",
+              "fieldName": "location",
+              "placeholder": "Austin,Texas,United States",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Target Business Name",
+              "fieldName": "target_business_name",
+              "placeholder": "Sunshine Kids Dentistry",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Target Website",
+              "fieldName": "target_website",
+              "placeholder": "https://example.com",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Named Competitors (optional, JSON array up to 5: [{\"name\":\"...\",\"url\":\"...\"}])",
+              "fieldName": "competitors_json",
+              "placeholder": "[{\"name\":\"Sample Dental\",\"url\":\"https://example.com\"}]",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "NeuronWriter API Key (optional add-on)",
+              "fieldName": "neuronwriter_api_key",
+              "placeholder": "n-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "NeuronWriter Project ID (optional add-on)",
+              "fieldName": "neuronwriter_project_id",
+              "placeholder": "ed0b47151fb35b02",
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "form-trigger",
+      "name": "Form Trigger",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -400,
+        0
+      ],
+      "webhookId": "ranking-report-form"
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Canonicalize inputs from either (a) Form Trigger v2.2 which emits values keyed\n// by fieldLabel, or (b) Webhook Trigger which wraps the POST body under .body.\nconst input = $input.first().json;\nconst form = (input && typeof input.body === 'object' && input.body !== null && Object.keys(input.body).length > 0)\n  ? input.body\n  : input;\n\nconst norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');\nconst pick = (...keys) => {\n  for (const k of keys) {\n    if (form[k] !== undefined && form[k] !== null && form[k] !== '') return form[k];\n  }\n  const targets = keys.map(norm);\n  for (const k of Object.keys(form)) {\n    const n = norm(k);\n    if (targets.some(t => n === t || n.startsWith(t))) return form[k];\n  }\n  return '';\n};\n\n// Parse competitors: array from webhook body, or JSON string from Form Trigger field.\nlet competitorsRaw = pick('competitors', 'competitors_json', 'Named Competitors');\nlet competitors = [];\nif (Array.isArray(competitorsRaw)) {\n  competitors = competitorsRaw;\n} else if (typeof competitorsRaw === 'string' && competitorsRaw.trim()) {\n  try { competitors = JSON.parse(competitorsRaw); }\n  catch { competitors = []; }\n}\ncompetitors = (Array.isArray(competitors) ? competitors : [])\n  .map(c => ({ name: String(c.name || '').trim(), url: String(c.url || '').trim() }))\n  .filter(c => c.name || c.url)\n  .slice(0, 5);\n\nreturn [{\n  json: {\n    search_term: pick('search_term', 'Search Term', 'searchTerm'),\n    location: pick('location', 'Location'),\n    target_business_name: pick('target_business_name', 'Target Business Name', 'targetBusinessName'),\n    target_website: pick('target_website', 'Target Website', 'targetWebsite') || '',\n    competitors,\n    neuronwriter_api_key: pick('neuronwriter_api_key', 'NeuronWriter API Key', 'neuronwriterApiKey') || '',\n    neuronwriter_project_id: pick('neuronwriter_project_id', 'NeuronWriter Project ID', 'neuronwriterProjectId') || '',\n    _raw_form: form\n  }\n}];"
+      },
+      "id": "normalize-form",
+      "name": "Normalize Form",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://kgsearch.googleapis.com/v1/entities:search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $json.target_business_name }} {{ $json.location }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            },
+            {
+              "name": "key",
+              "value": "AIzaSyCtMJUgY5Wqp1mIssepbVCpRorXqkxr2B8"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "kg-search",
+      "name": "KG Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -160,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://places.googleapis.com/v1/places:searchText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Goog-Api-Key",
+              "value": "AIzaSyBT6gGScuYDlhyvRNZ58zSQiK-iS3rOukM"
+            },
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.types,places.primaryType,places.websiteUri,places.regularOpeningHours,places.editorialSummary,places.photos,places.location,places.priceLevel,places.paymentOptions,places.parkingOptions,places.accessibilityOptions,places.goodForChildren,places.goodForGroups,places.reservable,places.businessStatus,places.nationalPhoneNumber,places.shortFormattedAddress"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"textQuery\": \"{{ $('Normalize Form').item.json.target_business_name }} {{ $('Normalize Form').item.json.location }}\"\n}",
+        "options": {}
+      },
+      "id": "places-search",
+      "name": "Places Text Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/serp/google/organic/live/advanced",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=[\n  {\n    \"keyword\": \"{{ $('Normalize Form').item.json.search_term }}\",\n    \"location_name\": \"{{ $('Normalize Form').item.json.location }}\",\n    \"language_code\": \"en\",\n    \"device\": \"desktop\",\n    \"depth\": 20\n  }\n]",
+        "options": {}
+      },
+      "id": "dataforseo-serp",
+      "name": "DataForSEO SERP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Competitor Enrichment\n// Builds a unified competitor set from (a) user-supplied named competitors\n// and (b) SERP top organic + local pack winners, then enriches each with:\n//   - DataForSEO domain rank + referring domains (one bulk call per metric)\n//   - Knowledge Graph entity (per competitor)\n//   - Google Business Profile with full attribute fieldMask (per competitor)\n//   - DataForSEO on_page/content_parsing (user-supplied competitors only -- cost control)\n// Also geocodes the search-center location and computes Haversine distance\n// from search center for the target + every competitor.\n\nconst form = $('Normalize Form').first().json;\nconst serpRaw = $('DataForSEO SERP').first().json;\nconst placesRaw = $('Places Text Search').first().json;\n\nconst GOOGLE_KEY = 'AIzaSyCtMJUgY5Wqp1mIssepbVCpRorXqkxr2B8';\nconst PLACES_KEY = 'AIzaSyBT6gGScuYDlhyvRNZ58zSQiK-iS3rOukM';\nconst DFS_AUTH = 'Basic ' + Buffer.from('abhishekbolarshetty@gmail.com:6aa69ca0a4bf8188').toString('base64');\nconst PLACES_FIELD_MASK = 'places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.types,places.primaryType,places.websiteUri,places.regularOpeningHours,places.editorialSummary,places.photos,places.location,places.priceLevel,places.paymentOptions,places.parkingOptions,places.accessibilityOptions,places.goodForChildren,places.goodForGroups,places.reservable,places.businessStatus,places.shortFormattedAddress';\n\nconst tryHost = (url) => {\n  if (!url) return '';\n  try { return new URL(url).hostname.replace(/^www\\./, '').toLowerCase(); }\n  catch { return String(url).replace(/^https?:\\/\\//, '').replace(/^www\\./, '').split('/')[0].toLowerCase(); }\n};\n\nconst haversine = (a, b) => {\n  if (!a || !b || a.lat == null || b.lat == null) return null;\n  const toRad = d => d * Math.PI / 180;\n  const R = 6371;\n  const dLat = toRad(b.lat - a.lat);\n  const dLon = toRad(b.lng - a.lng);\n  const lat1 = toRad(a.lat);\n  const lat2 = toRad(b.lat);\n  const h = Math.sin(dLat/2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon/2) ** 2;\n  return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));\n};\n\n// 1) Assemble competitor list -- user first, then SERP organic top 3, then local pack top 3.\nconst userList = (form.competitors || [])\n  .map(c => ({\n    source: 'user',\n    name: (c.name || '').trim(),\n    url: (c.url || '').trim(),\n    domain: tryHost(c.url)\n  }))\n  .filter(c => c.name || c.url)\n  .slice(0, 5);\n\nconst dfsItems = serpRaw.tasks?.[0]?.result?.[0]?.items || [];\nconst topOrganic = dfsItems\n  .filter(i => i.type === 'organic')\n  .slice(0, 3)\n  .map(i => ({\n    source: 'serp',\n    name: i.title,\n    url: i.url,\n    domain: (i.domain || tryHost(i.url) || '').replace(/^www\\./, '').toLowerCase(),\n    serp_position: i.rank_absolute,\n    serp_snippet: i.description\n  }));\nconst localPack = dfsItems\n  .filter(i => i.type === 'local_pack')\n  .slice(0, 3)\n  .map(p => ({\n    source: 'serp_local_pack',\n    name: p.title,\n    url: p.url,\n    domain: tryHost(p.url),\n    serp_position: p.rank_absolute,\n    local_pack_rating: p.rating?.value,\n    local_pack_rating_count: p.rating?.votes_count,\n    cid: p.cid\n  }));\n\nconst seen = new Set();\nconst competitors = [];\nconst pushIfNew = (c) => {\n  const key = (c.domain || c.name || '').toLowerCase();\n  if (!key || seen.has(key)) return;\n  seen.add(key);\n  competitors.push(c);\n};\nuserList.forEach(pushIfNew);\ntopOrganic.forEach(pushIfNew);\nlocalPack.forEach(pushIfNew);\n\n// 2) Target info\nconst targetDomain = tryHost(form.target_website);\nconst targetPlace = placesRaw.places?.[0] || null;\nconst targetLatLng = targetPlace?.location\n  ? { lat: targetPlace.location.latitude, lng: targetPlace.location.longitude }\n  : null;\n\n// 3) Geocode search center\nlet searchCenter = null;\ntry {\n  const geoRes = await this.helpers.httpRequest({\n    method: 'GET',\n    url: 'https://maps.googleapis.com/maps/api/geocode/json',\n    qs: { address: form.location, key: GOOGLE_KEY },\n    json: true\n  });\n  const loc = geoRes.results?.[0]?.geometry?.location;\n  if (loc) searchCenter = { lat: loc.lat, lng: loc.lng, formatted: geoRes.results[0].formatted_address };\n} catch (e) { /* non-fatal */ }\n\n// 4) Bulk DataForSEO calls for all domains (target + competitors)\nconst allDomains = [...new Set([targetDomain, ...competitors.map(c => c.domain)].filter(Boolean))];\n\nconst bulkRanksReq = allDomains.length\n  ? this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.dataforseo.com/v3/backlinks/bulk_ranks/live',\n      headers: { 'Authorization': DFS_AUTH, 'Content-Type': 'application/json' },\n      body: [{ targets: allDomains }],\n      json: true\n    }).catch(() => null)\n  : Promise.resolve(null);\n\nconst bulkRefReq = allDomains.length\n  ? this.helpers.httpRequest({\n      method: 'POST',\n      url: 'https://api.dataforseo.com/v3/backlinks/bulk_referring_domains/live',\n      headers: { 'Authorization': DFS_AUTH, 'Content-Type': 'application/json' },\n      body: [{ targets: allDomains }],\n      json: true\n    }).catch(() => null)\n  : Promise.resolve(null);\n\nconst [bulkRanksRes, bulkRefRes] = await Promise.all([bulkRanksReq, bulkRefReq]);\n\nconst rankMap = {};\n(bulkRanksRes?.tasks?.[0]?.result?.[0]?.items || []).forEach(i => { rankMap[i.target] = i.rank; });\nconst refMap = {};\n(bulkRefRes?.tasks?.[0]?.result?.[0]?.items || []).forEach(i => { refMap[i.target] = i.referring_domains; });\n\n// 5) Per-competitor: KG + Places + (user only) on-page parsing -- all in parallel\nconst enrichOne = async (c) => {\n  const enriched = { ...c };\n  enriched.dataforseo_rank = c.domain ? (rankMap[c.domain] ?? null) : null;\n  enriched.referring_domains = c.domain ? (refMap[c.domain] ?? null) : null;\n\n  const kgPromise = c.name\n    ? this.helpers.httpRequest({\n        method: 'GET',\n        url: 'https://kgsearch.googleapis.com/v1/entities:search',\n        qs: { query: `${c.name} ${form.location}`, limit: 1, key: GOOGLE_KEY },\n        json: true\n      }).catch(() => null)\n    : Promise.resolve(null);\n\n  const placesPromise = c.name\n    ? this.helpers.httpRequest({\n        method: 'POST',\n        url: 'https://places.googleapis.com/v1/places:searchText',\n        headers: {\n          'Content-Type': 'application/json',\n          'X-Goog-Api-Key': PLACES_KEY,\n          'X-Goog-FieldMask': PLACES_FIELD_MASK\n        },\n        body: { textQuery: `${c.name} ${form.location}` },\n        json: true\n      }).catch(() => null)\n    : Promise.resolve(null);\n\n  const onPagePromise = (c.source === 'user' && c.url)\n    ? this.helpers.httpRequest({\n        method: 'POST',\n        url: 'https://api.dataforseo.com/v3/on_page/content_parsing/live',\n        headers: { 'Authorization': DFS_AUTH, 'Content-Type': 'application/json' },\n        body: [{ url: c.url }],\n        json: true\n      }).catch(() => null)\n    : Promise.resolve(null);\n\n  const [kgRes, placesRes, opRes] = await Promise.all([kgPromise, placesPromise, onPagePromise]);\n\n  const kgItem = kgRes?.itemListElement?.[0]?.result || null;\n  enriched.kg = kgItem ? {\n    name: kgItem.name,\n    type: kgItem['@type'],\n    description: kgItem.description,\n    detailedDescription: kgItem.detailedDescription?.articleBody\n  } : null;\n\n  const place = placesRes?.places?.[0] || null;\n  if (place) {\n    enriched.gbp = {\n      displayName: place.displayName?.text,\n      formattedAddress: place.formattedAddress,\n      shortFormattedAddress: place.shortFormattedAddress,\n      rating: place.rating,\n      userRatingCount: place.userRatingCount,\n      primaryType: place.primaryType,\n      types: place.types,\n      websiteUri: place.websiteUri,\n      hours: place.regularOpeningHours?.weekdayDescriptions,\n      photoCount: (place.photos || []).length,\n      priceLevel: place.priceLevel,\n      attributes: {\n        paymentOptions: place.paymentOptions,\n        parkingOptions: place.parkingOptions,\n        accessibilityOptions: place.accessibilityOptions,\n        goodForChildren: place.goodForChildren,\n        goodForGroups: place.goodForGroups,\n        reservable: place.reservable\n      },\n      businessStatus: place.businessStatus,\n      location: place.location ? { lat: place.location.latitude, lng: place.location.longitude } : null\n    };\n  } else {\n    enriched.gbp = null;\n  }\n\n  enriched.distance_from_search_center_km = (searchCenter && enriched.gbp?.location)\n    ? Math.round(haversine(searchCenter, enriched.gbp.location) * 10) / 10\n    : null;\n\n  if (opRes) {\n    const page = opRes.tasks?.[0]?.result?.[0]?.items?.[0]?.page_content || {};\n    const meta = opRes.tasks?.[0]?.result?.[0]?.items?.[0]?.meta || {};\n    enriched.on_page = {\n      title: meta.title || page.title,\n      meta_description: meta.description || page.meta?.description,\n      h1: (page.header?.h1 && page.header.h1[0]) || meta.htags?.h1?.[0] || null,\n      h2: (page.header?.h2 || meta.htags?.h2 || []).slice(0, 15),\n      h3_count: (page.header?.h3 || meta.htags?.h3 || []).length,\n      word_count: meta.content?.plain_text_word_count || page.word_count || null\n    };\n  } else {\n    enriched.on_page = null;\n  }\n\n  return enriched;\n};\n\nconst enrichedCompetitors = await Promise.all(competitors.map(enrichOne));\n\nconst targetDistance = (searchCenter && targetLatLng)\n  ? Math.round(haversine(searchCenter, targetLatLng) * 10) / 10\n  : null;\n\nreturn [{\n  json: {\n    competitor_enrichment: {\n      competitors: enrichedCompetitors,\n      target: {\n        domain: targetDomain,\n        dataforseo_rank: targetDomain ? (rankMap[targetDomain] ?? null) : null,\n        referring_domains: targetDomain ? (refMap[targetDomain] ?? null) : null,\n        location: targetLatLng,\n        distance_from_search_center_km: targetDistance\n      },\n      search_center: searchCenter,\n      count: { user: userList.length, serp: enrichedCompetitors.length - userList.filter(u => seen.has((u.domain || u.name).toLowerCase())).length, total: enrichedCompetitors.length }\n    }\n  }\n}];"
+      },
+      "id": "competitor-enrichment",
+      "name": "Competitor Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// NeuronWriter add-on enrichment. Skips cleanly when no credentials provided.\nconst form = $('Normalize Form').first().json;\nconst apiKey = (form.neuronwriter_api_key || '').trim();\nconst projectId = (form.neuronwriter_project_id || '').trim();\n\nif (!apiKey || !projectId) {\n  return [{ json: { neuronwriter: null, neuronwriter_status: 'disabled' } }];\n}\n\nconst BASE = 'https://app.neuronwriter.com/neuron-api/0.5/writer';\nconst headers = {\n  'X-API-KEY': apiKey,\n  'Content-Type': 'application/json',\n  'Accept': 'application/json'\n};\nconst sleep = ms => new Promise(r => setTimeout(r, ms));\n\ntry {\n  const newQueryRes = await this.helpers.httpRequest({\n    method: 'POST',\n    url: BASE + '/new-query',\n    headers,\n    body: { project: projectId, keyword: form.search_term, engine: 'google.com', language: 'English' },\n    json: true\n  });\n\n  const queryId = newQueryRes.query || newQueryRes.id || newQueryRes.query_id;\n  if (!queryId) {\n    return [{ json: { neuronwriter: null, neuronwriter_status: 'error', neuronwriter_error: 'new-query did not return a query id', neuronwriter_raw: newQueryRes } }];\n  }\n\n  // Poll get-query -- budget ~3 min: 45s initial wait, then up to 9 polls at 15s each\n  await sleep(45000);\n\n  let data = null;\n  let lastStatus = null;\n  for (let i = 0; i < 10; i++) {\n    const resp = await this.helpers.httpRequest({\n      method: 'POST',\n      url: BASE + '/get-query',\n      headers,\n      body: { query: queryId },\n      json: true\n    });\n    lastStatus = resp.status;\n    if (resp.status === 'ready') { data = resp; break; }\n    if (resp.status === 'failed' || resp.status === 'error') {\n      return [{ json: { neuronwriter: null, neuronwriter_status: 'error', neuronwriter_error: resp.status, neuronwriter_raw: resp } }];\n    }\n    await sleep(15000);\n  }\n\n  if (!data) {\n    return [{ json: { neuronwriter: null, neuronwriter_status: 'timeout', neuronwriter_query_id: queryId, neuronwriter_last_status: lastStatus } }];\n  }\n\n  // Defensive extraction -- NeuronWriter's response schema varies\n  const terms = data.terms || {};\n  const competitors = data.competitors || [];\n  const termToStr = t => typeof t === 'string' ? t : (t && (t.t || t.term || t.text) || '');\n  const getArr = (obj, ...keys) => {\n    for (const k of keys) {\n      if (obj && Array.isArray(obj[k])) return obj[k];\n    }\n    return [];\n  };\n  const clean = arr => arr.map(termToStr).filter(Boolean);\n  const uniq = arr => [...new Set(arr)];\n\n  const h1FromTerms = clean(getArr(terms, 'h1'));\n  const h2FromTerms = clean(getArr(terms, 'h2'));\n  const competitorHeadings = [];\n  for (const c of competitors.slice(0, 10)) {\n    const hs = c.headings || c.h || [];\n    for (const h of hs) {\n      const text = typeof h === 'string' ? h : (h && (h.text || h.t) || '');\n      if (text) competitorHeadings.push(text);\n    }\n  }\n\n  const basicTerms = clean(getArr(terms, 'content_basic', 'basic', 'b')).slice(0, 40);\n  const extendedTerms = clean(getArr(terms, 'content_extended', 'extended', 'e')).slice(0, 30);\n  const titleTerms = clean(getArr(terms, 'title', 't')).slice(0, 20);\n\n  const entitiesRaw = data.entities || terms.entities || [];\n  const entities = clean(Array.isArray(entitiesRaw) ? entitiesRaw : []).slice(0, 30);\n\n  const questionsRaw = data.questions || terms.questions || data.suggested_queries || [];\n  const articleQueries = clean(Array.isArray(questionsRaw) ? questionsRaw : []).slice(0, 20);\n\n  return [{\n    json: {\n      neuronwriter: {\n        query_id: queryId,\n        headings: uniq([...h1FromTerms, ...h2FromTerms, ...competitorHeadings]).slice(0, 40),\n        terms: { basic: basicTerms, extended: extendedTerms, title: titleTerms, h1: h1FromTerms },\n        entities,\n        article_queries: articleQueries,\n        content_score_target: data.content_score_target || data.target_score || null\n      },\n      neuronwriter_status: 'ready'\n    }\n  }];\n} catch (err) {\n  return [{ json: { neuronwriter: null, neuronwriter_status: 'error', neuronwriter_error: String(err && err.message ? err.message : err) } }];\n}"
+      },
+      "id": "neuronwriter-enrichment",
+      "name": "NeuronWriter Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Pull canonical inputs from Normalize Form\nconst form = $('Normalize Form').first().json;\nconst search_term = form.search_term || '';\nconst location = form.location || '';\nconst target_business_name = form.target_business_name || '';\nconst target_website = form.target_website || '';\n\n// Pull API responses\nconst kgRaw = $('KG Search').first().json;\nconst placesRaw = $('Places Text Search').first().json;\nconst serpRaw = $('DataForSEO SERP').first().json;\n\n// Pull Competitor Enrichment output\nconst enrichmentOut = $('Competitor Enrichment').first().json;\nconst enrichment = enrichmentOut.competitor_enrichment || { competitors: [], target: {}, search_center: null };\n\n// Pull NeuronWriter add-on output (null when disabled/failed)\nconst nwOutput = $('NeuronWriter Enrichment').first().json;\nconst neuron = nwOutput.neuronwriter || null;\nconst neuronStatus = nwOutput.neuronwriter_status || 'disabled';\n\n// ---------- Prune KG ----------\nconst kgItem = (kgRaw.itemListElement && kgRaw.itemListElement[0]) || null;\nconst kg = kgItem ? {\n  name: kgItem.result?.name,\n  type: kgItem.result?.['@type'],\n  description: kgItem.result?.description,\n  detailedDescription: kgItem.result?.detailedDescription?.articleBody,\n  url: kgItem.result?.url,\n  resultScore: kgItem.resultScore\n} : { note: 'No KG entity found' };\n\n// ---------- Prune Places (target) ----------\nconst place = (placesRaw.places && placesRaw.places[0]) || {};\nconst gbp = {\n  displayName: place.displayName?.text,\n  formattedAddress: place.formattedAddress,\n  shortFormattedAddress: place.shortFormattedAddress,\n  rating: place.rating,\n  userRatingCount: place.userRatingCount,\n  types: place.types,\n  primaryType: place.primaryType,\n  websiteUri: place.websiteUri,\n  hours: place.regularOpeningHours?.weekdayDescriptions,\n  editorialSummary: place.editorialSummary?.text,\n  photoCount: (place.photos || []).length,\n  priceLevel: place.priceLevel,\n  businessStatus: place.businessStatus,\n  attributes: {\n    paymentOptions: place.paymentOptions,\n    parkingOptions: place.parkingOptions,\n    accessibilityOptions: place.accessibilityOptions,\n    goodForChildren: place.goodForChildren,\n    goodForGroups: place.goodForGroups,\n    reservable: place.reservable\n  },\n  dataforseo_domain_rank: enrichment.target?.dataforseo_rank ?? null,\n  referring_domains: enrichment.target?.referring_domains ?? null,\n  distance_from_search_center_km: enrichment.target?.distance_from_search_center_km ?? null,\n  search_center_address: enrichment.search_center?.formatted ?? null\n};\n\n// ---------- Prune DataForSEO SERP ----------\nconst dfsResult = serpRaw.tasks?.[0]?.result?.[0];\nconst items = dfsResult?.items || [];\n\nconst organic = items\n  .filter(i => i.type === 'organic')\n  .slice(0, 10)\n  .map(r => ({\n    position: r.rank_absolute,\n    title: r.title,\n    link: r.url,\n    snippet: r.description,\n    domain: r.domain\n  }));\n\nconst localPack = items\n  .filter(i => i.type === 'local_pack')\n  .slice(0, 3)\n  .map(p => ({\n    title: p.title,\n    description: p.description,\n    rating: p.rating?.value,\n    ratingCount: p.rating?.votes_count,\n    url: p.url,\n    cid: p.cid\n  }));\n\nconst knowledgeGraph = items.find(i => i.type === 'knowledge_graph') || null;\nconst answerBox = items.find(i => i.type === 'answer_box') || items.find(i => i.type === 'featured_snippet') || null;\nconst aiOverviewItem = items.find(i => i.type === 'ai_overview');\nconst aiOverview = aiOverviewItem ? { text: aiOverviewItem.text, references: aiOverviewItem.references } : null;\nconst paaItem = items.find(i => i.type === 'people_also_ask');\nconst peopleAlsoAsk = paaItem ? (paaItem.items || []).slice(0, 5).map(q => q.title) : [];\nconst relatedItem = items.find(i => i.type === 'related_searches');\nconst relatedSearches = relatedItem ? (relatedItem.items || []).slice(0, 5) : [];\n\nconst serpFeaturesPresent = [...new Set(items.map(i => i.type))];\n\nconst serp = {\n  organic,\n  localPack,\n  knowledgeGraph,\n  answerBox,\n  aiOverview,\n  peopleAlsoAsk,\n  relatedSearches,\n  serpFeaturesPresent\n};\n\n// ---------- Build Gemini prompts ----------\nconst systemPrompt = `You are a senior local search analyst. Your job is to produce an actionable ranking plan -- not a description, not a summary -- for a specific business trying to rank for a specific search term in a specific location.\n\nGROUNDING RULES (non-negotiable):\n1. Only use facts present in the <data> blocks. If a fact is not in the data, write \"not available in provided data\" -- do not infer or estimate.\n2. Every claim must cite a source: [KG], [GBP], [SERP], [COMPETITOR:N] (N is the 1-based index in the COMPETITORS array), or [NEURON].\n3. If data sources contradict, treat live sources (GBP, SERP, COMPETITORS) as truth and flag the discrepancy.\n4. Do not recommend any action that cannot be justified by a specific gap in the data. If you cannot justify an action, do not include it.\n5. The COMPETITORS array includes both user-supplied rivals (source='user') and SERP-discovered winners (source='serp' or 'serp_local_pack'). User-supplied competitors are strategically important even if they don't currently rank; SERP competitors prove what Google rewards. Use BOTH lenses.\n\nANALYSIS FRAMEWORK:\n- Infer search intent from SERP features.\n- Identify SERP features present and which ones the target does not appear in.\n- For competitive_gaps, compare target's GBP/website signals against the COMPETITORS array. Use concrete numbers: domain rank (dataforseo_rank, scale 0-1000), referring_domains, userRatingCount, photoCount, distance_from_search_center_km, attribute presence (paymentOptions/parkingOptions/etc), on_page headings + word_count where available.\n- Distance: if target's distance_from_search_center_km is materially higher than competitors', call this out as a structural geographic gap.\n- Classify gaps: 30 days (reviews, photos, posts, GBP attributes), 90 days (content, citations, on-page schema, headings), structural (domain rank/referring domains gap, category change, location).\n\nNEURON ADD-ON: If NEURON data is present (non-empty object), populate content_suggestions with up to 10 items drawn from NEURON headings, terms, entities, and article_queries. Pick items that address visible gaps in SERP features, competitor coverage, or intent coverage. Cite [NEURON]. If NEURON data reads 'not enabled', return content_suggestions as an empty array and do not reference NEURON anywhere.\n\nTONE: Direct, prescriptive, no hedging. Avoid \"consider\", \"might\", \"could\". Use \"do X because Y shows Z\".\n\nOUTPUT: Valid JSON only. No prose outside the JSON. No markdown code fences.`;\n\nconst userPrompt = `SEARCH TERM: ${search_term}\nLOCATION: ${location}\nTARGET BUSINESS: ${target_business_name}\nTARGET WEBSITE: ${target_website}\n\n<data source=\"KG\">\n${JSON.stringify(kg, null, 2)}\n</data>\n\n<data source=\"GBP\">\n${JSON.stringify(gbp, null, 2)}\n</data>\n\n<data source=\"SERP\">\n${JSON.stringify(serp, null, 2)}\n</data>\n\n<data source=\"COMPETITORS\" note=\"Indexed array; cite specific competitors with [COMPETITOR:N] using the 1-based index.\">\n${JSON.stringify(enrichment.competitors || [], null, 2)}\n</data>\n\n<data source=\"NEURON\" note=\"Optional add-on. If body reads 'not enabled', do not cite NEURON and leave content_suggestions empty.\">\n${neuron ? JSON.stringify(neuron, null, 2) : 'not enabled'}\n</data>\n\nProduce a ranking plan as valid JSON matching this exact schema:\n{\n  \"search_term\": \"string\",\n  \"search_intent\": \"informational | transactional | local | commercial\",\n  \"serp_features_present\": [\"array of strings\"],\n  \"target_current_visibility\": {\n    \"ranks_in_local_pack\": \"boolean or rank position\",\n    \"ranks_in_organic_top_10\": \"boolean or rank position\",\n    \"appears_in_knowledge_panel\": \"boolean\",\n    \"visibility_summary\": \"one sentence with citations\"\n  },\n  \"competitive_gaps\": [\n    { \"gap\": \"string\", \"evidence\": \"string with concrete numbers from COMPETITORS / GBP / SERP\", \"citation\": \"[COMPETITOR:N] or [SERP] or [GBP]\" }\n  ],\n  \"data_discrepancies\": [\n    { \"field\": \"string\", \"kg_value\": \"string\", \"live_value\": \"string\", \"action\": \"string\" }\n  ],\n  \"prioritized_actions\": [\n    { \"action\": \"string\", \"priority\": \"P0|P1|P2\", \"effort\": \"low|medium|high\", \"expected_impact\": \"string\", \"evidence_basis\": \"string\", \"timeframe\": \"this week|30 days|90 days|structural\" }\n  ],\n  \"quick_wins\": [\"top 3 P0 low-effort actions verbatim\"],\n  \"content_suggestions\": [\n    { \"suggestion\": \"string\", \"type\": \"heading|term|entity|query\", \"citation\": \"[NEURON]\", \"rationale\": \"one sentence tying to a specific gap in target coverage\" }\n  ],\n  \"cannot_assess\": [\"questions needing more data -- do NOT list items already covered by COMPETITORS (domain rank, referring domains, GBP attributes, distance) or by NEURON\"]\n}\n\nReturn only JSON.`;\n\nreturn [{\n  json: {\n    search_term,\n    location,\n    target_business_name,\n    target_website,\n    pruned: { kg, gbp, serp, neuron, neuron_status: neuronStatus, competitor_enrichment: enrichment },\n    gemini_request: {\n      systemInstruction: { parts: [{ text: systemPrompt }] },\n      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],\n      generationConfig: {\n        temperature: 0.2,\n        responseMimeType: 'application/json'\n      }\n    }\n  }\n}];"
+      },
+      "id": "build-payload",
+      "name": "Build Gemini Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyC1GVUA9ITTEQ5ugAVR6blvgUj6Q3xHsuU",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.gemini_request) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "gemini-call",
+      "name": "Gemini 2.5 Flash",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "// Extract the JSON plan from Gemini's response\nconst response = $input.first().json;\nconst text = response.candidates?.[0]?.content?.parts?.[0]?.text;\n\nif (!text) {\n  return [{ json: { error: 'No text in Gemini response', raw: response } }];\n}\n\nlet plan;\ntry {\n  plan = JSON.parse(text);\n} catch (e) {\n  const cleaned = text.replace(/^```json\\s*/i, '').replace(/```\\s*$/, '').trim();\n  try {\n    plan = JSON.parse(cleaned);\n  } catch (e2) {\n    return [{ json: { error: 'Failed to parse JSON from Gemini', raw_text: text } }];\n  }\n}\n\nconst inputs = $('Build Gemini Payload').first().json;\nconst neuron = inputs.pruned && inputs.pruned.neuron ? inputs.pruned.neuron : null;\nconst neuronStatus = inputs.pruned && inputs.pruned.neuron_status ? inputs.pruned.neuron_status : 'disabled';\nconst competitorEnrichment = inputs.pruned && inputs.pruned.competitor_enrichment ? inputs.pruned.competitor_enrichment : null;\nconst targetEnrichment = competitorEnrichment ? competitorEnrichment.target : null;\nconst targetGbp = inputs.pruned && inputs.pruned.gbp ? inputs.pruned.gbp : null;\n\nreturn [{\n  json: {\n    request: {\n      search_term: inputs.search_term,\n      location: inputs.location,\n      target_business_name: inputs.target_business_name,\n      target_website: inputs.target_website\n    },\n    plan,\n    neuronwriter: neuron,\n    neuronwriter_status: neuronStatus,\n    competitor_enrichment: competitorEnrichment,\n    target_enrichment: targetEnrichment,\n    target_gbp: targetGbp,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "parse-response",
+      "name": "Parse Gemini Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ranking-report",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        200
+      ],
+      "webhookId": "ranking-report-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-test",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -400,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "respond-test",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-final",
+      "name": "Respond with Plan",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Two triggers, one pipeline\n\n**Form Trigger** -- n8n-hosted form UI for quick testing.\n\n**Webhook** -- receives POST from the standalone frontend (`on-page-app.html`).\n- Set `Allowed Origins (CORS)` to `*` or your frontend origin.\n- The **Is Test?** node short-circuits pings with `{\"test\": true}` so Test button doesn't burn API credits.\n\nBoth triggers feed into **Normalize Form**, which handles either shape (raw Form Trigger output OR `{body: {...}}` webhook wrap).\n\nAt the end, **Respond with Plan** returns the parsed Gemini plan to the frontend.",
+        "height": 360,
+        "width": 340,
+        "color": 5
+      },
+      "id": "sticky-next-steps",
+      "name": "Webhook Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1520,
+        -400
+      ]
+    }
+  ],
+  "connections": {
+    "Form Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Test?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Test?": {
+      "main": [
+        [
+          {
+            "node": "Respond Test OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Form": {
+      "main": [
+        [
+          {
+            "node": "KG Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KG Search": {
+      "main": [
+        [
+          {
+            "node": "Places Text Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Places Text Search": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO SERP": {
+      "main": [
+        [
+          {
+            "node": "Competitor Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Competitor Enrichment": {
+      "main": [
+        [
+          {
+            "node": "NeuronWriter Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NeuronWriter Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Build Gemini Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Gemini Payload": {
+      "main": [
+        [
+          {
+            "node": "Gemini 2.5 Flash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini 2.5 Flash": {
+      "main": [
+        [
+          {
+            "node": "Parse Gemini Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Gemini Response": {
+      "main": [
+        [
+          {
+            "node": "Respond with Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

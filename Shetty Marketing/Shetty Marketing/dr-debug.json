@@ -1,0 +1,101 @@
+{
+    "version": "0.1.20260520",
+    "status_code": 20000,
+    "status_message": "Ok.",
+    "time": "0.0795 sec.",
+    "cost": 0.0101,
+    "tasks_count": 1,
+    "tasks_error": 0,
+    "tasks": [
+        {
+            "id": "05242348-1270-0388-0000-523efeeb2a52",
+            "status_code": 20000,
+            "status_message": "Ok.",
+            "time": "0.0518 sec.",
+            "cost": 0.0101,
+            "result_count": 1,
+            "path": [
+                "v3",
+                "dataforseo_labs",
+                "google",
+                "domain_rank_overview",
+                "live"
+            ],
+            "data": {
+                "api": "dataforseo_labs",
+                "function": "domain_rank_overview",
+                "se_type": "google",
+                "target": "theinspiredroom.net",
+                "location_name": "United States",
+                "language_code": "en"
+            },
+            "result": [
+                {
+                    "se_type": "google",
+                    "target": "theinspiredroom.net",
+                    "location_code": 2840,
+                    "language_code": "en",
+                    "total_count": 1,
+                    "items_count": 1,
+                    "items": [
+                        {
+                            "se_type": "google",
+                            "location_code": 2840,
+                            "language_code": "en",
+                            "metrics": {
+                                "organic": {
+                                    "pos_1": 207,
+                                    "pos_2_3": 621,
+                                    "pos_4_10": 2874,
+                                    "pos_11_20": 2888,
+                                    "pos_21_30": 1894,
+                                    "pos_31_40": 1504,
+                                    "pos_41_50": 1192,
+                                    "pos_51_60": 799,
+                                    "pos_61_70": 601,
+                                    "pos_71_80": 455,
+                                    "pos_81_90": 333,
+                                    "pos_91_100": 141,
+                                    "etv": 191991.4374384191,
+                                    "count": 13509,
+                                    "estimated_paid_traffic_cost": 188994.10338840692,
+                                    "is_new": 5508,
+                                    "is_up": 4574,
+                                    "is_down": 2931,
+                                    "is_lost": 21453,
+                                    "clickstream_etv": null,
+                                    "clickstream_gender_distribution": null,
+                                    "clickstream_age_distribution": null
+                                },
+                                "paid": {
+                                    "pos_1": 0,
+                                    "pos_2_3": 0,
+                                    "pos_4_10": 0,
+                                    "pos_11_20": 0,
+                                    "pos_21_30": 0,
+                                    "pos_31_40": 0,
+                                    "pos_41_50": 0,
+                                    "pos_51_60": 0,
+                                    "pos_61_70": 0,
+                                    "pos_71_80": 0,
+                                    "pos_81_90": 0,
+                                    "pos_91_100": 0,
+                                    "etv": 0,
+                                    "count": 0,
+                                    "estimated_paid_traffic_cost": 0,
+                                    "is_new": 0,
+                                    "is_up": 0,
+                                    "is_down": 0,
+                                    "is_lost": 0,
+                                    "clickstream_etv": null,
+                                    "clickstream_gender_distribution": null,
+                                    "clickstream_age_distribution": null
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

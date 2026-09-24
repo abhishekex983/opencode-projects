@@ -1,0 +1,12 @@
+- generic [active] [ref=f5e1]:
+  - generic [ref=f5e3]:
+    - generic [ref=f5e4]: Personal Gantt Chart
+    - generic [ref=f5e11]:
+      - button "Sign In" [ref=f5e12] [cursor=pointer]
+      - button "Create Account" [ref=f5e13] [cursor=pointer]
+    - generic [ref=f5e14]:
+      - generic [ref=f5e15]
+      - generic [ref=f5e18]
+      - button "Sign In" [ref=f5e21] [cursor=pointer]
+    - paragraph [ref=f5e22]: Your data syncs across all your devices in real-time.Sign in from any device to see your latest tasks.
+  - text: No dates picked yet. Add dates above.

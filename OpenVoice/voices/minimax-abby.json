@@ -1,0 +1,10 @@
+{
+  "name": "Abby Voice (MiniMax)",
+  "voice_id": "abby-voice-final",
+  "source_audio": "reference_audio/abby-voice-final.wav",
+  "file_id": 431450619400436,
+  "model": "speech-2.8-hd",
+  "sample_rate": 22050,
+  "created": "2026-08-16",
+  "description": "Abby voice cloned via MiniMax Speech 2.8"
+}

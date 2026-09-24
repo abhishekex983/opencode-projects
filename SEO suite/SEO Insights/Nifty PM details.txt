@@ -1,0 +1,11 @@
+Client ID
+ZYSKtspFiAq0JFXoTvLpGVT3X84GbSMB
+
+Client Secret
+j1D11WEcdlbKrTB6mRVWPOpxckM5XLkyPmPEhPvcyaHWbFFWTcnVr4JuGIWFndzf
+
+Authorize URL
+https://nifty.pm/authorize?response_type=code&client_id=ZYSKtspFiAq0JFXoTvLpGVT3X84GbSMB&redirect_uri=https://n8n.srv1195841.hstgr.cloud/rest/oauth2-credential/callback&scope=file,doc,message,project,task,subtask,subteam
+
+Redirect URLs:
+https://n8n.srv1195841.hstgr.cloud/rest/oauth2-credential/callback

@@ -1,0 +1,4 @@
+https://n8n.srv1195841.hstgr.cloud/webhook/serp-analysis-analyze
+https://n8n.srv1195841.hstgr.cloud/webhook/serp-analysis-search
+
+https://n8n.srv1195841.hstgr.cloud/webhook/search-intent

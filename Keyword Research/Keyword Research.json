@@ -1,0 +1,1114 @@
+{
+  "name": "Keyword Research",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Keyword Research\n\n**Two webhook paths in one workflow:**\n\n### Path A: Keyword Discovery\n`POST /keyword-discover`\n- Input: `{ seed_keyword, location?, language? }`\n- Expands seed keyword via DataForSEO keyword_suggestions + keyword_ideas\n- Fetches KD via bulk_keyword_difficulty (skipped for global)\n- Output: `{ keywords: [{ keyword, search_volume, kd }], request, generated_at }`\n- Cost: ~$0.015/location, ~$0.01 global\n\n### Path B: SERP Analysis\n`POST /keyword-serp`\n- Input: `{ keyword, location?, language?, depth? }`\n- Fetches live SERP via DataForSEO\n- Output: `{ results: [...], features: {...}, request, generated_at }`\n- Cost: ~$0.003\n\n**Setup:**\n1. Import into n8n (credentials already wired to your existing DataForSEO credential)\n2. Activate workflow\n3. Copy Production URLs into keyword-research.html",
+        "height": 400,
+        "width": 420
+      },
+      "id": "e80b43ff-50b6-4c9e-883a-b916efce9892",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        19200,
+        3872
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keyword-discover",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "d5fd064b-df7f-4946-adb2-1cec6688a9cd",
+      "name": "Webhook - Discover",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        19440,
+        4400
+      ],
+      "webhookId": "keyword-discover-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-test-discover",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "88345b24-0820-4c5d-9e2f-3978853835e7",
+      "name": "Is Test? - Discover",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        19648,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Keyword Discovery webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "64d06fd6-4ab5-4607-8cc7-1297aff5581f",
+      "name": "Respond Test - Discover",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        19872,
+        4512
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\n\nconst seedKeyword = String(body.seed_keyword || body.keyword || '').trim();\nif (!seedKeyword) throw new Error('seed_keyword is required');\n\nconst location = String(body.location || '').trim();\nconst language = String(body.language || 'en').trim();\nconst isGlobal = !location || location.toLowerCase() === 'global';\nconst limit = Math.max(50, Math.min(3000, Number(body.limit) || 500));\n\nreturn [{\n  json: {\n    seed_keyword: seedKeyword,\n    location: isGlobal ? '' : location,\n    language,\n    is_global: isGlobal,\n    limit,\n    requested_at: body.requested_at || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "591cf6b7-303f-4673-a880-5a96f2e78a8d",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        19872,
+        4272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = [{\n  keyword: input.seed_keyword,\n  location_name: input.location || undefined,\n  language_code: input.language,\n  limit: input.limit || 500,\n  include_seed_keyword: true,\n  order_by: ['keyword_info.search_volume,desc']\n}];\nreturn [{ json: { ...input, dfs_body: body } }];"
+      },
+      "id": "246783a6-ffbf-4a87-ae84-e98ae7d3afe0",
+      "name": "Build KW Suggestions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20080,
+        4176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/keyword_suggestions/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.dfs_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "4f832c18-8e11-42fa-b808-927a47e11449",
+      "name": "DataForSEO KW Suggestions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        20304,
+        4176
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = [{\n  keyword: input.seed_keyword,\n  location_name: input.location || undefined,\n  language_code: input.language,\n  limit: Math.min(input.limit || 500, 1000),\n  include_seed_keyword: false\n}];\nreturn [{ json: { ...input, dfs_body: body } }];"
+      },
+      "id": "983e3f70-102a-4540-b0f1-78265bfd7792",
+      "name": "Build KW Ideas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20080,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/keyword_ideas/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.dfs_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "d552713d-238f-4a41-ae9b-1ca76a2fe528",
+      "name": "DataForSEO KW Ideas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        20304,
+        4400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst limit = input.limit || 500;\nconst depth = limit <= 100 ? 1 : limit <= 300 ? 2 : limit <= 1500 ? 3 : 4;\nconst body = [{\n  keyword: input.seed_keyword,\n  location_name: input.location || undefined,\n  language_code: input.language,\n  depth\n}];\nreturn [{ json: { ...input, dfs_body: body } }];"
+      },
+      "id": "5b191c7c-e2df-42ac-9fd4-a0a3e5177f69",
+      "name": "Build Related Keywords",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20080,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/related_keywords/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.dfs_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "9938fe60-657e-4254-9553-e0a565d0832a",
+      "name": "DataForSEO Related Keywords",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        20304,
+        4624
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {},
+      "id": "a46e2410-47c4-471c-9447-c8b1fe440950",
+      "name": "Merge Suggestions & Ideas",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        20528,
+        4272
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "02250a6c-d36e-485a-86f1-1fb2d5920272",
+      "name": "Merge with Related",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        20752,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allBranchData = $input.all();\nconst firstItem = $input.first().json;\n\nfunction extractKwItems(resp) {\n  const tasks = resp && resp.tasks;\n  if (!Array.isArray(tasks) || !tasks.length) return [];\n  const result = tasks[0] && tasks[0].result;\n  if (!Array.isArray(result) || !result.length) return [];\n  const items = result[0] && result[0].items;\n  return Array.isArray(items) ? items : [];\n}\n\nfunction parseKeyword(item) {\n  const kw = String(item.keyword || '').trim().toLowerCase();\n  if (!kw || kw.length < 2 || kw.length > 100) return null;\n  const vi = item.keyword_info || {};\n  const vp = item.keyword_properties || {};\n  return {\n    keyword: kw,\n    search_volume: typeof vi.search_volume === 'number' ? vi.search_volume : null,\n    cpc: typeof vi.cpc === 'number' ? vi.cpc : null,\n    kd: typeof vp.keyword_difficulty === 'number' ? vp.keyword_difficulty : null\n  };\n}\n\nconst allItems = [];\nfor (const item of allBranchData) {\n  allItems.push(...extractKwItems(item.json));\n}\n\nconst seen = new Set();\nconst unique = [];\nfor (const item of allItems) {\n  const parsed = parseKeyword(item);\n  if (!parsed) continue;\n  if (seen.has(parsed.keyword)) continue;\n  seen.add(parsed.keyword);\n  unique.push(parsed);\n}\n\nunique.sort((a, b) => (b.search_volume || 0) - (a.search_volume || 0));\n\nreturn [{ json: {\n  seed_keyword: firstItem.seed_keyword,\n  location: firstItem.location,\n  language: firstItem.language,\n  is_global: firstItem.is_global,\n  keywords: unique,\n  requested_at: firstItem.requested_at\n}}];"
+      },
+      "id": "ee429e30-b825-4501-8509-59e0a193d9d2",
+      "name": "Merge & Dedupe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20960,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst keywords = (input.keywords || []).map(k => k.keyword);\nreturn [{ json: { ...input, intent_body: [{ keywords, language_code: input.language }] } }];"
+      },
+      "id": "1f4a6347-8969-4428-b632-b0224fabd10c",
+      "name": "Build Intent Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21184,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/search_intent/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.intent_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "03433fd0-bbba-4482-b3f0-1acf093093ae",
+      "name": "DataForSEO Search Intent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        21408,
+        4400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Merge & Dedupe').first().json;\nconst intentResp = $input.first().json;\n\nconst intentMap = new Map();\nconst intentItems = intentResp && intentResp.tasks && intentResp.tasks[0] && intentResp.tasks[0].result;\nif (Array.isArray(intentItems)) {\n  for (const item of intentItems) {\n    if (item && item.keyword) {\n      const kw = String(item.keyword).toLowerCase();\n      const intent = item.keyword_intent || {};\n      intentMap.set(kw, {\n        intent: intent.label || 'informational',\n        intent_confidence: typeof intent.probability === 'number' ? Math.round(intent.probability * 100) : null\n      });\n    }\n  }\n}\n\nfunction isQuestion(kw) {\n  const k = kw.toLowerCase();\n  if (/^(how|what|why|when|where|who|which|can |do |does |is |are |should |will |would |could |did )/i.test(k)) return true;\n  if (/\\?$/.test(k)) return true;\n  return false;\n}\n\nfunction classifyIntentRegex(kw) {\n  const k = kw.toLowerCase();\n  if (isQuestion(kw)) return 'question';\n  if (/\\b(guide|tutorial|explained|examples?|tips|ideas|ways to|learn|understand|definition|meaning|overview|beginner|introduction|steps?|process|method|technique|strategy)\\b/i.test(k)) return 'informational';\n  if (/\\b(buy|purchase|order|shop|shop now|subscribe|sign up|register|get started|download|hire|book|reserve)\\b/i.test(k)) return 'transactional';\n  if (/\\b(price|pricing|cost|cheap|cheapest|discount|coupon|deal|deals|sale|offer|offers|near me|nearby)\\b/i.test(k)) return 'transactional';\n  if (/\\b(best|top|review|comparison|compare|versus|vs\\.?|alternative|alternatives|roundup|pros and cons|benefits|features|rating|ranked)\\b/i.test(k)) return 'commercial';\n  if (/\\b(login|sign in|log in|dashboard|account|portal|homepage|official|website|app)\\b/i.test(k)) return 'navigational';\n  return 'informational';\n}\n\nconst keywords = (prev.keywords || []).map(kw => {\n  const intentData = intentMap.get(kw.keyword);\n  let intent, intent_confidence;\n  if (intentData) {\n    intent = intentData.intent;\n    intent_confidence = intentData.intent_confidence;\n    if (intent === 'informational' && isQuestion(kw.keyword)) intent = 'question';\n  } else {\n    intent = classifyIntentRegex(kw.keyword);\n    intent_confidence = null;\n  }\n  return { ...kw, intent, intent_confidence };\n});\n\nreturn [{ json: { ...prev, keywords } }];"
+      },
+      "id": "b724c1dd-6e34-4663-95ff-a3a326df0701",
+      "name": "Attach Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21632,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-global",
+              "leftValue": "={{ $json.is_global }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "09e9dfb1-460e-4489-b50b-d3ece0b535d3",
+      "name": "Is Global?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        21840,
+        4400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst kws = (input.keywords || []).map(k => k.keyword);\nreturn [{ json: {\n  ...input,\n  kd_body: [{\n    keywords: kws,\n    location_name: input.location,\n    language_code: input.language\n  }]\n}}];"
+      },
+      "id": "2b2bf689-ef87-4ac4-9633-ae3a3c8cd7c8",
+      "name": "Build KD Body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21840,
+        4176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/dataforseo_labs/google/bulk_keyword_difficulty/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.kd_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "f73ebb67-a8f5-49e8-b397-30a5ca6fc446",
+      "name": "DataForSEO Bulk KD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        22064,
+        4176
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nreturn [{ json: { ...input, kd_response: null } }];"
+      },
+      "id": "c65ccfac-eb1b-4a8b-bbdc-27ccf70870cb",
+      "name": "Skip KD (Global)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21840,
+        4624
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Attach Intent').first().json;\nconst kdResp = $input.first().json;\n\nconst kdMap = new Map();\nconst kdItems = kdResp && kdResp.tasks && kdResp.tasks[0] && kdResp.tasks[0].result && kdResp.tasks[0].result[0] && kdResp.tasks[0].result[0].items;\nif (Array.isArray(kdItems)) {\n  for (const it of kdItems) {\n    if (it && it.keyword) {\n      const kd = typeof it.keyword_difficulty === 'number' ? it.keyword_difficulty : null;\n      kdMap.set(String(it.keyword).toLowerCase(), kd);\n    }\n  }\n}\n\nconst keywords = (prev.keywords || []).map(kw => ({\n  ...kw,\n  kd: kdMap.has(kw.keyword) ? kdMap.get(kw.keyword) : kw.kd\n}));\n\nreturn [{ json: {\n  seed_keyword: prev.seed_keyword,\n  location: prev.location,\n  language: prev.language,\n  is_global: prev.is_global,\n  keywords,\n  requested_at: prev.requested_at\n}}];"
+      },
+      "id": "8602c2c8-b3ea-4fd4-8a14-8c2431c8d632",
+      "name": "Attach KD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22288,
+        4272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nreturn [{ json: {\n  request: {\n    seed_keyword: input.seed_keyword,\n    location: input.location || 'Global',\n    language: input.language\n  },\n  keywords: input.keywords.map(k => ({\n    keyword: k.keyword,\n    search_volume: k.search_volume,\n    kd: k.kd,\n    intent: k.intent || 'informational',\n    intent_confidence: k.intent_confidence || null\n  })),\n  generated_at: new Date().toISOString()\n}}];"
+      },
+      "id": "6ed4d007-7ce6-46bb-8bc6-5d25188a11af",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        22512,
+        4272
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "a022e4e7-4a4f-44a2-9ee6-2b91a15e933d",
+      "name": "Respond - Discover",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        22720,
+        4272
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keyword-serp",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "adea401e-9bc3-4cf1-97f9-92f8e5358276",
+      "name": "Webhook - SERP",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        19440,
+        4800
+      ],
+      "webhookId": "keyword-serp-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-test-serp",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "521f04a3-bc29-483f-8476-10aab7f13a91",
+      "name": "Is Test? - SERP",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        19648,
+        4800
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Keyword SERP webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "fd9e502f-b0d2-4028-8cc3-cd5552667f05",
+      "name": "Respond Test - SERP",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        19872,
+        4912
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\n\nconst keyword = String(body.keyword || '').trim();\nif (!keyword) throw new Error('keyword is required');\n\nconst location = String(body.location || '').trim();\nconst language = String(body.language || 'en').trim();\nlet depth = Number(body.depth);\nif (!Number.isFinite(depth)) depth = 10;\ndepth = Math.max(5, Math.min(depth, 30));\nconst isGlobal = !location || location.toLowerCase() === 'global';\nconst dr_threshold = Math.max(5, Math.min(50, Number(body.dr_threshold) || 20));\n\nreturn [{ json: {\n  keyword,\n  location: isGlobal ? '' : location,\n  language,\n  depth,\n  dr_threshold,\n  is_global: isGlobal,\n  requested_at: body.requested_at || new Date().toISOString()\n}}];"
+      },
+      "id": "0456c46e-a9a9-44b4-978c-cd7d2945019a",
+      "name": "Normalize Input - SERP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        19872,
+        4672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst task = {\n  keyword: input.keyword,\n  language_code: input.language,\n  device: 'desktop',\n  depth: input.depth\n};\nif (!input.is_global) {\n  task.location_name = input.location;\n}\nreturn [{ json: { ...input, dfs_body: [task] } }];"
+      },
+      "id": "2c208946-f6a7-46df-8c7e-37bb8ce3b081",
+      "name": "Build SERP Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20080,
+        4672
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/serp/google/organic/live/advanced",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.dfs_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "2ce1cd48-c44b-4681-b519-c28d36668706",
+      "name": "DataForSEO SERP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        20304,
+        4672
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $('Normalize Input - SERP').first().json;\nconst resp = $input.first().json;\n\nconst taskResult = resp && resp.tasks && resp.tasks[0] && resp.tasks[0].result && resp.tasks[0].result[0];\nif (!taskResult) {\n  return [{ json: {\n    results: [],\n    features: {},\n    request: { keyword: input.keyword, location: input.location || 'Global', language: input.language, depth: input.depth },\n    error: 'No SERP result from DataForSEO',\n    generated_at: new Date().toISOString()\n  }}];\n}\n\nconst items = taskResult.items || [];\n\nconst organic = items\n  .filter(i => i.type === 'organic')\n  .slice(0, input.depth)\n  .map(r => ({\n    position: r.rank_absolute,\n    title: r.title,\n    url: r.url,\n    domain: r.domain || '',\n    description: r.description || ''\n  }));\n\nconst paaItem = items.find(i => i.type === 'people_also_ask');\nconst paa = paaItem && Array.isArray(paaItem.items)\n  ? paaItem.items.slice(0, 8).map(q => q.title).filter(Boolean)\n  : [];\n\nconst relatedItem = items.find(i => i.type === 'related_searches');\nconst related = relatedItem && Array.isArray(relatedItem.items)\n  ? relatedItem.items.slice(0, 10)\n  : [];\n\nconst featured = items.find(i => i.type === 'featured_snippet') || null;\nconst aiOverview = items.find(i => i.type === 'ai_overview') || null;\nconst knowledgeGraph = items.find(i => i.type === 'knowledge_graph') || null;\n\nreturn [{ json: {\n  results: organic,\n  features: {\n    people_also_ask: paa,\n    related_searches: related,\n    featured_snippet: featured ? { title: featured.title, description: featured.description, url: featured.url } : null,\n    ai_overview: aiOverview ? { present: true } : null,\n    knowledge_graph: knowledgeGraph ? { title: knowledgeGraph.title, description: knowledgeGraph.description } : null\n  },\n  request: {\n    keyword: input.keyword,\n    location: input.location || 'Global',\n    language: input.language,\n    depth: input.depth\n  },\n  dr_threshold: input.dr_threshold || 20,\n  generated_at: new Date().toISOString()\n}}];"
+      },
+      "id": "fbe9e2a7-9ab0-4d5d-9bea-e3a38f412eac",
+      "name": "Prune SERP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20544,
+        4672
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst results = input.results || [];\n\nconst HIGH_AUTHORITY = new Set([\n  'youtube.com', 'wikipedia.org', 'amazon.com', 'facebook.com', 'twitter.com',\n  'instagram.com', 'linkedin.com', 'pinterest.com', 'tiktok.com',\n  'forbes.com', 'nytimes.com', 'wsj.com', 'bbc.com', 'cnn.com', 'reuters.com',\n  'theguardian.com', 'washingtonpost.com', 'usatoday.com', 'nbcnews.com',\n  'cbsnews.com', 'abcnews.go.com', 'foxnews.com', 'nypost.com',\n  'healthline.com', 'webmd.com', 'mayoclinic.org', 'clevelandclinic.org',\n  'nih.gov', 'cdc.gov', 'who.int', 'medlineplus.gov'\n]);\n\nconst UGC_PATTERNS = /reddit\\.com|quora\\.com|stackoverflow\\.com|stackexchange\\.com|medium\\.com|substack\\.com|blogspot\\.com|wordpress\\.com|quora\\.com|discord\\.com|github\\.com|gitlab\\.com|facebook\\.com\\/groups|youtube\\.com\\/channel/i;\n\nconst domains = [];\nconst domainSet = new Set();\nfor (const r of results) {\n  const d = (r.domain || '').replace(/^www\\./, '').toLowerCase();\n  if (!d || domainSet.has(d)) continue;\n  domainSet.add(d);\n  const isHighAuthority = HIGH_AUTHORITY.has(d);\n  const isUgc = UGC_PATTERNS.test(d);\n  domains.push({ domain: d, isHighAuthority, isUgc });\n}\n\nreturn [{ json: { ...input, domains: domains.filter(d => !d.isHighAuthority) } }];"
+      },
+      "id": "82a14a9a-845f-4972-b0ff-1fd01df2df13",
+      "name": "Collect Domains",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20768,
+        4672
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/backlinks/bulk_ranks/live",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic YWJoaXNoZWtib2xhcnNoZXR0eUBnbWFpbC5jb206NmFhNjljYTBhNGJmODE4OA=="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify([{ targets: $json.domains.map(d => d.domain) }]) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "1fdaf86c-c071-4a02-a796-d87a0a2bd3ad",
+      "name": "DataForSEO Bulk Ranks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        20992,
+        4672
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Collect Domains').first().json;\nconst rankResp = $input.first().json;\nconst results = prev.results || [];\nconst domainMeta = prev.domains || [];\n\\nconst DR_THRESHOLD = Number(input.dr_threshold) || 20;\n\nconst UGC_PATTERNS = /reddit\\.com|quora\\.com|stackoverflow\\.com|stackexchange\\.com|medium\\.com|substack\\.com|blogspot\\.com|wordpress\\.com|quora\\.com|discord\\.com|github\\.com|gitlab\\.com|facebook\\.com\\/groups|youtube\\.com\\/channel/i;\n\nconst drMap = new Map();\nconst rankItems = rankResp && rankResp.tasks && rankResp.tasks[0] && rankResp.tasks[0].result && rankResp.tasks[0].result[0] && rankResp.tasks[0].result[0].items;\nif (Array.isArray(rankItems)) {\n  for (const item of rankItems) {\n    if (item && item.target) {\n      const d = String(item.target).replace(/^www\\./, '').toLowerCase();\n      const rank = typeof item.rank === 'number' ? item.rank : 0;\n      const dr = Math.round(rank / 10);\n      drMap.set(d, dr);\n    }\n  }\n}\n\nlet greenFruits = 0;\nlet ugcCount = 0;\nlet weakSpotsCount = 0;\nlet weakTop3 = 0;\n\nconst enriched = results.map(r => {\n  const d = (r.domain || '').replace(/^www\\./, '').toLowerCase();\n  const dr = drMap.has(d) ? drMap.get(d) : null;\n  const isUgc = UGC_PATTERNS.test(d);\n  const isHighAuthority = [\n    'youtube.com', 'wikipedia.org', 'amazon.com', 'facebook.com', 'twitter.com',\n    'instagram.com', 'linkedin.com', 'forbes.com', 'nytimes.com', 'bbc.com',\n    'healthline.com', 'webmd.com', 'mayoclinic.org', 'nih.gov', 'cdc.gov'\n  ].includes(d);\n\n  let weakSpotType = null;\n  if (!isHighAuthority) {\n    if (isUgc) {\n      weakSpotType = 'blue_fruit';\n      ugcCount++;\n      weakSpotsCount++;\n    } else if (dr !== null && dr < DR_THRESHOLD) {\n      weakSpotType = 'green_fruit';\n      greenFruits++;\n      weakSpotsCount++;\n      if (r.position <= 3) weakTop3++;\n    }\n  }\n\n  return { ...r, dr, weak_spot_type: weakSpotType };\n});\n\nlet serpDifficulty;\nif (greenFruits + ugcCount >= 3 || weakTop3 >= 2) {\n  serpDifficulty = 1;\n} else if (weakSpotsCount >= 1) {\n  serpDifficulty = 2;\n} else {\n  serpDifficulty = 3;\n}\n\nreturn [{ json: {\n  ...prev,\n  results: enriched,\n  weak_spot_summary: {\n    green_fruits: greenFruits,\n    ugc_count: ugcCount,\n    weak_spots_count: weakSpotsCount,\n    serp_difficulty: serpDifficulty\n  }\n}}];"
+      },
+      "id": "f4a236f3-4e56-4153-b4e5-60a70c2cd062",
+      "name": "Classify Weak Spots",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        21200,
+        4672
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "32488e14-1a09-494c-83e4-34ad6e14f8e4",
+      "name": "Respond - SERP",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        21424,
+        4672
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Discover": {
+      "main": [
+        [
+          {
+            "node": "Is Test? - Discover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Test? - Discover": {
+      "main": [
+        [
+          {
+            "node": "Respond Test - Discover",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Build KW Suggestions",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build KW Ideas",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Related Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build KW Suggestions": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO KW Suggestions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build KW Ideas": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO KW Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Related Keywords": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO Related Keywords",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO KW Suggestions": {
+      "main": [
+        [
+          {
+            "node": "Merge Suggestions & Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO KW Ideas": {
+      "main": [
+        [
+          {
+            "node": "Merge Suggestions & Ideas",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Suggestions & Ideas": {
+      "main": [
+        [
+          {
+            "node": "Merge with Related",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO Related Keywords": {
+      "main": [
+        [
+          {
+            "node": "Merge with Related",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge with Related": {
+      "main": [
+        [
+          {
+            "node": "Merge & Dedupe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge & Dedupe": {
+      "main": [
+        [
+          {
+            "node": "Build Intent Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Intent Request": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO Search Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO Search Intent": {
+      "main": [
+        [
+          {
+            "node": "Attach Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach Intent": {
+      "main": [
+        [
+          {
+            "node": "Is Global?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Global?": {
+      "main": [
+        [
+          {
+            "node": "Skip KD (Global)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build KD Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build KD Body": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO Bulk KD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO Bulk KD": {
+      "main": [
+        [
+          {
+            "node": "Attach KD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip KD (Global)": {
+      "main": [
+        [
+          {
+            "node": "Attach KD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach KD": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond - Discover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - SERP": {
+      "main": [
+        [
+          {
+            "node": "Is Test? - SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Test? - SERP": {
+      "main": [
+        [
+          {
+            "node": "Respond Test - SERP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Input - SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input - SERP": {
+      "main": [
+        [
+          {
+            "node": "Build SERP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SERP Request": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO SERP": {
+      "main": [
+        [
+          {
+            "node": "Prune SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prune SERP": {
+      "main": [
+        [
+          {
+            "node": "Collect Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Domains": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO Bulk Ranks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO Bulk Ranks": {
+      "main": [
+        [
+          {
+            "node": "Classify Weak Spots",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Weak Spots": {
+      "main": [
+        [
+          {
+            "node": "Respond - SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "66ead2e8-4699-4645-a7be-d62c927f5674",
+  "meta": {
+    "instanceId": "85aa62db498652bf5abcecbe93e8f8d7dc29c844051f21336ff396b0b8794328"
+  },
+  "id": "3KfiWrGJYYwdlRER",
+  "tags": [
+    {
+      "updatedAt": "2026-06-15T02:52:14.239Z",
+      "createdAt": "2026-06-15T02:52:14.239Z",
+      "id": "YrhWjO43EZZxlFKF",
+      "name": "keyword-research"
+    },
+    {
+      "updatedAt": "2026-06-15T02:52:14.213Z",
+      "createdAt": "2026-06-15T02:52:14.213Z",
+      "id": "fBrEqSvOsapNmin9",
+      "name": "seo-tools"
+    }
+  ]
+}

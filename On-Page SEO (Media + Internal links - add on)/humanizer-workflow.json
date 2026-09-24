@@ -1,0 +1,106 @@
+{
+  "name": "Text Humanizer",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Text Humanizer\n\nSingle webhook that humanizes AI-generated text.\n\n**Endpoint:** `POST /humanize`\n\n**What it does:**\n1. Protects APA-style citations from rewriting\n2. Expands contractions (can't → cannot)\n3. Adds academic transitions (Moreover, Additionally...)\n4. Normalizes spacing",
+        "height": 260,
+        "width": 400
+      },
+      "id": "sticky-readme",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-600, -200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "humanize",
+        "responseMode": "responseNode",
+        "options": { "allowedOrigins": "*" }
+      },
+      "id": "humanize-webhook",
+      "name": "Humanize Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, 0],
+      "webhookId": "humanize"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "is-test-cond-humanize",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-test-humanize",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"Humanizer webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "respond-test-ok",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [200, -100]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "var input = $input.first().json;\nvar form = (input && typeof input.body === 'object' && input.body !== null && Object.keys(input.body).length > 0) ? input.body : input;\nvar text = form.text || '';\nvar preserveLinebreaks = form.preserve_linebreaks !== false;\n\nif (!text.trim()) {\n  return [{ json: { humanized_text: '', orig_word_count: 0, new_word_count: 0, words_added: 0, orig_sentence_count: 0, new_sentence_count: 0, sentences_added: 0 } }];\n}\n\n// --- Citation Protection ---\nvar CITATION_RE = /\\(\\s*[A-Za-z&\\-,.\\s]+(?:et al\\.\\s*)?,\\s*\\d{4}(?:,\\s*(?:pp?\\.\\s*\\d+(?:-\\d+)?))?\\s*\\)/g;\nvar placeholderMap = {};\nvar protectedText = text.replace(CITATION_RE, function(match) {\n  var key = '[[REF_' + (Object.keys(placeholderMap).length + 1) + ']]';\n  placeholderMap[key] = match;\n  return key;\n});\n\n// --- Contraction Expansion ---\nvar CONTRACTIONS = {\n  \"can't\": \"cannot\", \"won't\": \"will not\", \"shan't\": \"shall not\",\n  \"ain't\": \"is not\", \"i'm\": \"i am\", \"it's\": \"it is\",\n  \"we're\": \"we are\", \"they're\": \"they are\", \"you're\": \"you are\",\n  \"he's\": \"he is\", \"she's\": \"she is\", \"that's\": \"that is\",\n  \"there's\": \"there is\", \"what's\": \"what is\", \"who's\": \"who is\",\n  \"let's\": \"let us\", \"didn't\": \"did not\", \"doesn't\": \"does not\",\n  \"don't\": \"do not\", \"couldn't\": \"could not\", \"shouldn't\": \"should not\",\n  \"wouldn't\": \"would not\", \"isn't\": \"is not\", \"aren't\": \"are not\",\n  \"weren't\": \"were not\", \"hasn't\": \"has not\", \"haven't\": \"have not\",\n  \"hadn't\": \"had not\", \"mustn't\": \"must not\", \"needn't\": \"need not\",\n  \"i've\": \"i have\", \"you've\": \"you have\", \"we've\": \"we have\",\n  \"they've\": \"they have\", \"i'd\": \"i would\", \"you'd\": \"you would\",\n  \"he'd\": \"he would\", \"she'd\": \"she would\", \"we'd\": \"we would\",\n  \"they'd\": \"they would\", \"i'll\": \"i will\", \"you'll\": \"you will\",\n  \"he'll\": \"he will\", \"she'll\": \"she will\", \"we'll\": \"we will\",\n  \"they'll\": \"they will\", \"it'll\": \"it will\"\n};\n\nfunction expandContractions(sentence) {\n  return sentence.replace(/\\b(\\w+)(n't|'re|'s|'ll|'ve|'d|'m)\\b/gi, function(match, base, suffix) {\n    var key = base.toLowerCase() + suffix.toLowerCase();\n    var expanded = CONTRACTIONS[key];\n    if (expanded) {\n      return base.charAt(0).toUpperCase() === base.charAt(0) ? expanded.charAt(0).toUpperCase() + expanded.slice(1) : expanded;\n    }\n    return match;\n  });\n}\n\n// --- Academic Transitions ---\nvar TRANSITIONS = [\n  \"Moreover,\", \"Additionally,\", \"Furthermore,\", \"Hence,\",\n  \"Therefore,\", \"Consequently,\", \"Nonetheless,\", \"Nevertheless,\",\n  \"In contrast,\", \"On the other hand,\", \"In addition,\", \"As a result,\",\n  \"Similarly,\", \"Likewise,\", \"However,\", \"Meanwhile,\"\n];\n\nfunction addTransition(sentence, pTrans) {\n  if (Math.random() < pTrans) {\n    var t = TRANSITIONS[Math.floor(Math.random() * TRANSITIONS.length)];\n    return t + ' ' + sentence;\n  }\n  return sentence;\n}\n\nfunction countWords(s) { return s.split(/\\s+/).filter(function(w) { return w.length > 0; }).length; }\nfunction countSentences(s) { var count = 0; var inSentence = false; for (var i = 0; i < s.length; i++) { if ('.!?'.indexOf(s.charAt(i)) >= 0) { inSentence = true; } else if (inSentence && s.charAt(i) !== ' ') { count++; inSentence = false; } } if (inSentence) count++; return count; }\n\nfunction humanizeLine(line, pTrans) {\n  var result = expandContractions(line);\n  result = addTransition(result, pTrans);\n  return result;\n}\n\n// --- Process ---\nvar origWC = countWords(protectedText);\nvar origSC = countSentences(protectedText);\n\nvar humanized;\nif (preserveLinebreaks) {\n  var lines = protectedText.split('\\n');\n  var outLines = [];\n  for (var i = 0; i < lines.length; i++) {\n    if (!lines[i].trim()) { outLines.push(''); continue; }\n    outLines.push(humanizeLine(lines[i], 0.2));\n  }\n  humanized = outLines.join('\\n');\n} else {\n  var parts = protectedText.split(/([.!?]+\\s*)/);\n  var result = '';\n  for (var j = 0; j < parts.length; j++) {\n    if (parts[j] && parts[j].trim()) {\n      result += humanizeLine(parts[j], 0.2);\n    } else {\n      result += (parts[j] || '');\n    }\n  }\n  humanized = result;\n}\n\n// --- Restore Citations ---\nvar finalText = humanized;\nfor (var placeholder in placeholderMap) {\n  finalText = finalText.split(placeholder).join(placeholderMap[placeholder]);\n}\n\n// --- Normalize Spacing ---\nfinalText = finalText.replace(/[ \\t]+([.,;:!?])/g, '$1');\nfinalText = finalText.replace(/\\([ \\t]+/g, '(');\nfinalText = finalText.replace(/[ \\t]+\\)/g, ')');\nfinalText = finalText.replace(/[ \\t]{2,}/g, ' ');\n\nvar newWC = countWords(finalText);\nvar newSC = countSentences(finalText);\n\nreturn [{\n  json: {\n    humanized_text: finalText,\n    orig_word_count: origWC,\n    new_word_count: newWC,\n    words_added: newWC - origWC,\n    orig_sentence_count: origSC,\n    new_sentence_count: newSC,\n    sentences_added: newSC - origSC\n  }\n}];"
+      },
+      "id": "humanize-code",
+      "name": "Humanize Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-humanized",
+      "name": "Respond with Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [400, 100]
+    }
+  ],
+  "connections": {
+    "Humanize Webhook": {
+      "main": [[{ "node": "Is Test?", "type": "main", "index": 0 }]]
+    },
+    "Is Test?": {
+      "main": [
+        [{ "node": "Respond Test OK", "type": "main", "index": 0 }],
+        [{ "node": "Humanize Text", "type": "main", "index": 0 }]
+      ]
+    },
+    "Humanize Text": {
+      "main": [[{ "node": "Respond with Result", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

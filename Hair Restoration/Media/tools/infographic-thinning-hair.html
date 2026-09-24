@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1000px; height: 1500px; overflow: hidden; font-family: 'Inter', sans-serif; background: #faf9fc; color: #1a1a2e; }
+  .pin { width: 1000px; height: 1500px; position: relative; overflow: hidden; }
+  .header { background: #002444; padding: 32px 56px 24px; text-align: center; }
+  .logo { width: 180px; height: auto; margin-bottom: 12px; }
+  .title { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 42px; color: #fff; letter-spacing: -0.5px; line-height: 1.15; margin-bottom: 6px; }
+  .subtitle { font-weight: 500; font-size: 19px; color: rgba(255,255,255,0.75); margin-bottom: 14px; }
+  .header-line { width: 70px; height: 3px; background: #B91C1C; margin: 0 auto; border-radius: 2px; }
+  .body { padding: 20px 36px 0; }
+  .card { background: #fff; border-radius: 14px; padding: 22px 28px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); display: flex; gap: 18px; align-items: flex-start; }
+  .card-icon { width: 48px; height: 48px; min-width: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+  .icon-navy { background: #E8EDF2; }
+  .icon-red { background: #FEF2F2; }
+  .card-icon svg { width: 26px; height: 26px; }
+  .card-content { flex: 1; }
+  .card-title { font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 22px; color: #002444; margin-bottom: 10px; }
+  .card-bullets { list-style: none; padding: 0; }
+  .card-bullets li { font-size: 14.5px; line-height: 1.5; padding: 3px 0; padding-left: 20px; position: relative; }
+  .card-bullets li::before { content: ''; position: absolute; left: 0; top: 10px; width: 7px; height: 7px; border-radius: 50%; background: #B91C1C; }
+  .definition-text { font-size: 16px; line-height: 1.6; color: #1a1a2e; }
+  .highlight { color: #B91C1C; font-weight: 700; }
+  .stat-box { background: #B91C1C; border-radius: 14px; padding: 22px 28px; margin-bottom: 16px; text-align: center; color: #fff; display: flex; align-items: center; justify-content: center; gap: 24px; }
+  .stat-number { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 60px; line-height: 1; }
+  .stat-text { text-align: left; }
+  .stat-label { font-size: 17px; font-weight: 600; }
+  .stat-sub { font-size: 12px; opacity: 0.8; margin-top: 3px; }
+  .warning-box { background: #fff; border-radius: 14px; padding: 18px 24px; margin-bottom: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border-left: 5px solid #B91C1C; display: flex; align-items: center; gap: 14px; }
+  .warning-icon { width: 40px; height: 40px; min-width: 40px; background: #FEF2F2; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .warning-icon svg { width: 22px; height: 22px; fill: #B91C1C; }
+  .warning-text { font-size: 14px; line-height: 1.5; font-weight: 500; }
+  .footer { background: #002444; padding: 20px 48px 24px; text-align: center; position: absolute; bottom: 0; left: 0; right: 0; }
+  .footer-line { width: 50px; height: 2px; background: #B91C1C; margin: 0 auto 10px; border-radius: 1px; }
+  .footer-url { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 16px; color: #fff; margin-bottom: 3px; }
+  .footer-tagline { font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
+  .footer-disclaimer { font-size: 9.5px; color: rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+<div class="pin">
+  <div class="header">
+    <img class="logo" src="https://thinhairgrowthguide.com/wp-content/uploads/2026/08/Thin-Hair-Growth-Guide.png" alt="Thin Hair Growth Guide">
+    <div class="title">What Does It Mean When<br>Your Hair Is Thinning?</div>
+    <div class="subtitle">Here's What's Really Going On</div>
+    <div class="header-line"></div>
+  </div>
+  <div class="body">
+    <div class="card">
+      <div class="card-icon icon-navy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#002444" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      </div>
+      <div class="card-content">
+        <div class="card-title">What Is It?</div>
+        <div class="definition-text">Thinning hair means individual strands are becoming <span class="highlight">finer or less dense</span>, reducing your hair's overall volume. It's not the same as balding — it's a gradual change in thickness and coverage.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon icon-red">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#B91C1C" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <div class="card-content">
+        <div class="card-title">Common Causes</div>
+        <ul class="card-bullets">
+          <li><strong>Genetics</strong> — up to 80% of men, 50% of women</li>
+          <li><strong>Hormonal shifts</strong> — pregnancy, menopause, thyroid</li>
+          <li><strong>Significant stress</strong> — physical or emotional</li>
+          <li><strong>Nutritional deficiencies</strong> — iron, vitamin D, protein</li>
+          <li><strong>Medical conditions</strong> — alopecia, autoimmune disorders</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon icon-navy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#002444" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      </div>
+      <div class="card-content">
+        <div class="card-title">Signs to Watch For</div>
+        <ul class="card-bullets">
+          <li>A <span class="highlight">wider hair part</span> than before</li>
+          <li>More <span class="highlight">visible scalp</span> through your hair</li>
+          <li>A ponytail that feels <span class="highlight">less full</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-icon icon-red">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#B91C1C" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <div class="card-content">
+        <div class="card-title">Can It Grow Back?</div>
+        <ul class="card-bullets">
+          <li><strong>Minoxidil</strong> — FDA-approved topical treatment</li>
+          <li><strong>Scalp health</strong> — clean, inflammation-free environment</li>
+          <li>Regrowth is <span class="highlight">often possible</span> depending on the cause</li>
+        </ul>
+      </div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number">80%</div>
+      <div class="stat-text">
+        <div class="stat-label">of men experience<br>pattern hair loss</div>
+        <div class="stat-sub">50% of women are also affected</div>
+      </div>
+    </div>
+    <div class="warning-box">
+      <div class="warning-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+      </div>
+      <div class="warning-text"><strong>Sudden thinning</strong> or at-home treatments not working? <span class="highlight">See a doctor</span> for a proper diagnosis to rule out underlying issues.</div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="footer-line"></div>
+    <div class="footer-url">thinhairgrowthguide.com</div>
+    <div class="footer-tagline">Your Trusted Guide to Hair Growth</div>
+    <div class="footer-disclaimer">Consult your doctor before starting any treatment</div>
+  </div>
+</div>
+</body>
+</html>

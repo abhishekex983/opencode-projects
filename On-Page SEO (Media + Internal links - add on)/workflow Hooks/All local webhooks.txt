@@ -1,0 +1,15 @@
+Entity presence: http://localhost:5679/webhook/entity-presence
+Search Intent: https://abhishek-onpage-webhooks.fly.dev/webhook/search-intent
+Salience Brief: https://abhishek-onpage-webhooks.fly.dev/webhook/salience-brief
+Salience Score: https://abhishek-onpage-webhooks.fly.dev/webhook/salience
+Research Questions: https://abhishek-onpage-webhooks.fly.dev/webhook/question-research
+
+SERP Analysis:
+https://abhishek-onpage-webhooks.fly.dev/webhook/serp-analysis-search
+https://abhishek-onpage-webhooks.fly.dev/webhook/serp-analysis-analyze
+
+Content Creation:
+https://abhishek-onpage-webhooks.fly.dev/webhook/content-optimizer-outline
+https://abhishek-onpage-webhooks.fly.dev/webhook/content-optimizer-content
+
+Niche Research: http://localhost:5679/webhook/niche-research

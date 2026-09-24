@@ -1,0 +1,131 @@
+{
+  "name": "BudgetOS AI Proxy",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "budgetos-ai",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "node-webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "webhookId": "budgetos-ai-proxy",
+      "notes": "POST endpoint hit by the BudgetOS browser app.\n\nAfter import:\n1. Open this node → Credentials → 'Header Auth' → Create New.\n2. Set credential Name = Authorization, Value = Bearer <pick-a-long-secret>.\n3. Save the SAME bearer string into BudgetOS → Settings → Bearer Token field.\n\nExpected incoming body:\n  { model, messages, response_format?, max_tokens? }",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "HTTP-Referer",
+              "value": "https://budgetos.app"
+            },
+            {
+              "name": "X-Title",
+              "value": "BudgetOS"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('Webhook').item.json.body }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "node-openrouter",
+      "name": "OpenRouter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        300
+      ],
+      "notes": "Forwards the incoming body verbatim to OpenRouter.\n\nAfter import:\n1. Open this node → Credential for 'Header Auth' → Create New.\n2. Name the credential 'OpenRouter API Key'.\n3. Set Header Name = Authorization, Header Value = Bearer sk-or-...\n   (paste your real OpenRouter key — it lives only here, never in the browser).\n\nThe model and prompt are passed through from the browser request body.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        780,
+        300
+      ],
+      "notes": "Returns OpenRouter's response untouched. Must include choices[0].message.content for BudgetOS to parse.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "OpenRouter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionTimeout": 180,
+    "timezone": "America/Toronto"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "BudgetOS"
+    }
+  ],
+  "triggerCount": 1,
+  "versionId": "1"
+}

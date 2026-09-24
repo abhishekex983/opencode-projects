@@ -1,0 +1,413 @@
+{
+  "name": "SERP Analysis - Analyze",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## SERP Analysis — Step 2: Analyze\n\n**Flow:**\n1. Webhook accepts `{ keyword, your_url, urls: [...], location, language, paa, related_searches }`. Caps URLs at 12.\n2. Normalize + validate inputs.\n3. Build URL List: emits 1 item per URL (your_url first, then competitors).\n4. Firecrawl Scrape: HTTP Request fans out — one scrape per URL, parallel by default.\n5. Extract Signals: parse markdown + HTML for headings, word count, meta, schema types, FAQ presence, tables, links, etc.\n6. Aggregate: collect all signals via `$input.all()`, compute medians + shares for competitors, separate yours.\n7. Build LLM Payload: pack the aggregate + your_page + each competitor into a structured prompt.\n8. OpenRouter Chat (`google/gemini-2.5-pro`) returns structured JSON: summary, common_patterns, gaps, recommendations, meta_comparison, content_depth_verdict.\n9. Parse LLM → Respond.\n\n**Before running:**\n- Activate workflow, copy Production URL into `on-page-app.html` → SERP Analysis → Analyze webhook URL.\n- Firecrawl + OpenRouter API keys are pre-filled in the HTTP node Authorization headers. Rotate them in the respective consoles when needed.\n\n**Resilience:**\n- Firecrawl Scrape has `onError: continueRegularOutput` + `neverError: true`. A single failed scrape becomes `{ error: ... }` and the rest of the pipeline still runs.\n- LLM call same — bad parse / API error returns the partial analysis with an `ai_error` field.\n\n**Cost / latency:**\n- N+1 Firecrawl scrapes per run (you + N competitors, capped at 12).\n- 1 Gemini call.\n- Plan ~45–120s end-to-end.",
+        "height": 640,
+        "width": 400
+      },
+      "id": "d0e1f2a3-b4c5-4d6e-7f8a-9b0c1d2e3f4a",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "serp-analysis-analyze",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        480
+      ],
+      "webhookId": "serp-analysis-analyze-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"SERP Analysis (analyze) webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "a3b4c5d6-e7f8-4a9b-0c1d-2e3f4a5b6c7d",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        608,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const MAX = 12;\nconst input = $input.first().json;\n\n// Try several possible body shapes (n8n webhook versions / proxies wrap differently)\nconst candidates = [];\nif (input && typeof input === 'object') {\n  if (input.body && typeof input.body === 'object') candidates.push(input.body);\n  candidates.push(input);\n  if (input.json && typeof input.json === 'object') candidates.push(input.json);\n}\nconst body = candidates.find(b => b && (typeof b.your_url !== 'undefined' || typeof b.keyword !== 'undefined')) || candidates[0] || {};\n\nfunction shapeReport() {\n  const topKeys = Object.keys(input || {});\n  const bodyKeys = Object.keys(body || {});\n  return ' (top-level keys: [' + topKeys.join(', ') + '], chosen-body keys: [' + bodyKeys.join(', ') + '])';\n}\n\nfunction cleanUrl(raw) {\n  // Strip control chars + zero-width / BOM chars that sneak in from clipboard paste\n  return String(raw == null ? '' : raw).replace(/[\\u0000-\\u001F\\u007F\\u200B-\\u200D\\uFEFF]/g, '').trim();\n}\n\nfunction coerceUrl(raw, label) {\n  const v = cleanUrl(raw);\n  if (!v) throw new Error(label + ' is required.' + shapeReport());\n  const candidate = /^https?:\\/\\//i.test(v) ? v : 'https://' + v;\n  // Permissive http(s) + host check. Avoids n8n sandbox quirks with the URL constructor.\n  if (!/^https?:\\/\\/[^\\s\\/]+/i.test(candidate)) {\n    throw new Error(label + ' is not a valid URL (received: ' + JSON.stringify(v) + ')');\n  }\n  return candidate;\n}\n\nconst keyword = String(body.keyword || '').trim();\nif (!keyword) throw new Error('keyword is required.' + shapeReport());\n\n// your_url is now optional — if provided, validate; if empty, skip\nconst your_url = body.your_url ? coerceUrl(body.your_url, 'your_url') : '';\n\nlet urls = Array.isArray(body.urls) ? body.urls.map(cleanUrl).filter(Boolean) : [];\nurls = urls.map(u => /^https?:\\/\\//i.test(u) ? u : 'https://' + u);\nurls = [...new Set(urls)].slice(0, MAX);\nif (!urls.length) throw new Error('at least 1 competitor URL is required.' + shapeReport());\n\nreturn [{\n  json: {\n    keyword,\n    your_url,\n    urls,\n    location: String(body.location || 'United States').trim(),\n    language: String(body.language || 'en').trim(),\n    paa: Array.isArray(body.paa) ? body.paa.map(String).slice(0, 8) : [],\n    related_searches: Array.isArray(body.related_searches) ? body.related_searches.map(String).slice(0, 10) : [],\n    requested_at: body.requested_at || new Date().toISOString()\n  }\n}];\n"
+      },
+      "id": "b4c5d6e7-f8a9-4b0c-1d2e-3f4a5b6c7d8e",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $input.first().json;\nconst all = inputs.your_url ? [inputs.your_url, ...inputs.urls] : [...inputs.urls];\nreturn all.map(u => ({ json: { url: u, is_yours: inputs.your_url ? u === inputs.your_url : false } }));\n"
+      },
+      "id": "c5d6e7f8-a9b0-4c1d-2e3f-4a5b6c7d8e9f",
+      "name": "Build URL List",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer fc-79ed532c5804415d8503b3edd18750e0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.url, formats: ['markdown', 'html', 'links'], onlyMainContent: true, blockAds: true, waitFor: 1500 }) }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "d6e7f8a9-b0c1-4d2e-3f4a-5b6c7d8e9f0a",
+      "name": "Firecrawl Scrape",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1024,
+        368
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract on-page signals from the Firecrawl response for one URL.\n// Mirrors webhook-service/handlers/serp-analysis.js extractSignals().\n// Runs once per input item (mode: runOnceForEachItem) so each scraped page\n// gets its own extraction.\n\nconst meta = $('Build URL List').item.json;\nconst url = meta.url;\nconst is_yours = !!meta.is_yours;\nconst resp = $input.item.json || {};\n\nfunction getDomain(u) {\n  const m = /^https?:\\/\\/([^\\/?#]+)/i.exec(String(u || ''));\n  return m ? m[1].replace(/^www\\./i, '').toLowerCase() : '';\n}\nfunction decodeEntities(s) {\n  return String(s || '')\n    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\");\n}\nfunction stripMarkdown(md) {\n  return String(md || '')\n    .replace(/```[\\s\\S]*?```/g, ' ')\n    .replace(/`[^`]*`/g, ' ')\n    .replace(/!\\[[^\\]]*]\\([^)]*\\)/g, ' ')\n    .replace(/\\[([^\\]]+)]\\([^)]*\\)/g, '$1')\n    .replace(/^\\s{0,3}#{1,6}\\s+/gm, '')\n    .replace(/^[*+-]\\s+/gm, '')\n    .replace(/^\\d+\\.\\s+/gm, '')\n    .replace(/[*_~>]/g, ' ')\n    .replace(/\\|/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\nfunction parseHeadingsFromMarkdown(md) {\n  const out = []; const re = /^(\\s{0,3})(#{1,6})\\s+(.+?)\\s*#*\\s*$/gm; let m;\n  while ((m = re.exec(String(md || ''))) !== null) {\n    const level = m[2].length;\n    const text = m[3].replace(/[`*_~]/g, '').trim();\n    if (text) out.push({ level, text });\n  }\n  return out;\n}\nfunction parseHeadingsFromHtml(html) {\n  const out = []; const re = /<h([1-6])\\b[^>]*>([\\s\\S]*?)<\\/h\\1>/gi; let m;\n  while ((m = re.exec(String(html || ''))) !== null) {\n    const text = decodeEntities(m[2].replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim());\n    if (text) out.push({ level: Number(m[1]), text });\n  }\n  return out;\n}\nfunction extractTagText(html, tag) {\n  const re = new RegExp('<' + tag + '\\\\b[^>]*>([\\\\s\\\\S]*?)<\\\\/' + tag + '>', 'i');\n  const m = re.exec(String(html || ''));\n  return m ? decodeEntities(m[1].replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim()) : '';\n}\nfunction extractMetaDescription(html) {\n  const re = /<meta\\b[^>]*name=[\"']description[\"'][^>]*>/i;\n  const tag = (re.exec(String(html || '')) || [])[0] || '';\n  const c = /content=[\"']([^\"']*)[\"']/i.exec(tag);\n  return c ? decodeEntities(c[1]).trim() : '';\n}\nfunction extractSchemaTypes(html) {\n  const out = new Set();\n  const re = /\"@type\"\\s*:\\s*\"([^\"]+)\"/g; let m;\n  while ((m = re.exec(String(html || ''))) !== null) out.add(m[1]);\n  const re2 = /itemtype=[\"']https?:\\/\\/schema\\.org\\/([^\"']+)[\"']/g;\n  while ((m = re2.exec(String(html || ''))) !== null) out.add(m[1]);\n  return [...out];\n}\nfunction countMatches(s, re) { const m = String(s || '').match(re); return m ? m.length : 0; }\n\n// Detect Firecrawl error → emit minimal record with error.\nif (resp.success === false || resp.error) {\n  return { json: {\n    url, domain: getDomain(url), is_yours, source: 'fallback',\n    error: resp.error || resp.message || 'firecrawl returned success=false',\n    title: '', h1: '', meta_description: '', meta_description_length: 0,\n    title_length: 0, word_count: 0, headings_outline: [],\n    heading_counts: { h1: 0, h2: 0, h3: 0, h4: 0 },\n    internal_links: 0, external_links: 0, image_count: 0, video_count: 0,\n    table_count: 0, list_count: 0, code_block_count: 0, blockquote_count: 0,\n    has_faq_section: false, schema_types: [], language: ''\n  } };\n}\n\nconst data = resp.data || {};\nconst md = String(data.markdown || '');\nconst html = String(data.html || '');\nconst pageMeta = data.metadata || {};\nconst links = Array.isArray(data.links) ? data.links : [];\n\nconst mdHeadings = parseHeadingsFromMarkdown(md);\nconst htmlHeadings = mdHeadings.length ? mdHeadings : parseHeadingsFromHtml(html);\n\nconst plain = stripMarkdown(md) || (html ? decodeEntities(html.replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, ' ').replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim()) : '');\nconst wordCount = plain ? plain.split(/\\s+/).filter(Boolean).length : 0;\n\nconst domain = getDomain(url);\nlet internalLinks = 0, externalLinks = 0;\nfor (const l of links) {\n  const d = getDomain(l);\n  if (!d) continue;\n  if (d === domain) internalLinks += 1; else externalLinks += 1;\n}\n\nconst headingTexts = htmlHeadings.map(h => h.text);\nconst hasFaqHeading = headingTexts.some(t => /faq|frequently asked|q&a/i.test(t)) || headingTexts.filter(t => /\\?$/.test(t)).length >= 3;\n\nconst tablesMd = countMatches(md, /^\\s*\\|.*\\|\\s*$/gm);\nconst tablesHtml = countMatches(html, /<table\\b/gi);\nconst tableCount = Math.max(tablesMd >= 2 ? Math.floor(tablesMd / 3) : 0, tablesHtml);\nconst imageCount = countMatches(md, /!\\[[^\\]]*]\\([^)]*\\)/g) + countMatches(html, /<img\\b/gi);\nconst videoCount = countMatches(html, /<iframe\\b[^>]*(youtube|vimeo|wistia|loom)/gi) + countMatches(html, /<video\\b/gi);\nconst bullets = countMatches(md, /^[*+-]\\s+/gm);\nconst numbered = countMatches(md, /^\\d+\\.\\s+/gm);\nconst listCount = bullets + numbered;\nconst codeBlocks = countMatches(md, /```[\\s\\S]*?```/g);\nconst blockquotes = countMatches(md, /^>\\s+/gm);\nconst schemaTypes = extractSchemaTypes(html);\n\nconst title = (pageMeta.title || pageMeta.ogTitle || extractTagText(html, 'title') || '').trim();\nconst metaDescription = (pageMeta.description || pageMeta.ogDescription || extractMetaDescription(html) || '').trim();\nconst h1 = htmlHeadings.find(h => h.level === 1);\n\nreturn {\n  json: {\n    url, domain, is_yours, source: 'firecrawl', error: null,\n    title,\n    h1: h1 ? h1.text : '',\n    meta_description: metaDescription,\n    meta_description_length: metaDescription.length,\n    title_length: title.length,\n    word_count: wordCount,\n    headings_outline: htmlHeadings.slice(0, 60),\n    heading_counts: {\n      h1: htmlHeadings.filter(h => h.level === 1).length,\n      h2: htmlHeadings.filter(h => h.level === 2).length,\n      h3: htmlHeadings.filter(h => h.level === 3).length,\n      h4: htmlHeadings.filter(h => h.level === 4).length\n    },\n    internal_links: internalLinks,\n    external_links: externalLinks,\n    image_count: imageCount,\n    video_count: videoCount,\n    table_count: tableCount,\n    list_count: listCount,\n    code_block_count: codeBlocks,\n    blockquote_count: blockquotes,\n    has_faq_section: hasFaqHeading,\n    schema_types: schemaTypes,\n    language: pageMeta.language || pageMeta.ogLocale || ''\n  }\n};",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "e7f8a9b0-c1d2-4e3f-4a5b-6c7d8e9f0a1b",
+      "name": "Extract Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect per-URL signals back into a single item with your_page + competitors[] + aggregate.\nconst inputs = $('Normalize Input').first().json;\nconst allItems = $input.all().map(it => it.json);\n\nconst yourPage = allItems.find(p => p.is_yours) || null;\nconst competitors = yourPage ? allItems.filter(p => !p.is_yours) : allItems;\n\nfunction median(arr) {\n  const xs = arr.filter(n => Number.isFinite(n)).sort((a, b) => a - b);\n  if (!xs.length) return null;\n  const mid = Math.floor(xs.length / 2);\n  return xs.length % 2 ? xs[mid] : Math.round((xs[mid - 1] + xs[mid]) / 2);\n}\n\nconst ok = competitors.filter(c => !c.error);\nconst schemaFreq = {};\nfor (const c of ok) for (const t of c.schema_types || []) schemaFreq[t] = (schemaFreq[t] || 0) + 1;\n\nconst aggregate = ok.length ? {\n  pages_analyzed: ok.length,\n  pages_failed: competitors.length - ok.length,\n  median_word_count: median(ok.map(c => c.word_count)),\n  median_h2_count: median(ok.map(c => c.heading_counts.h2)),\n  median_internal_links: median(ok.map(c => c.internal_links)),\n  median_external_links: median(ok.map(c => c.external_links)),\n  median_image_count: median(ok.map(c => c.image_count)),\n  median_video_count: median(ok.map(c => c.video_count)),\n  faq_section_share: Math.round((ok.filter(c => c.has_faq_section).length / ok.length) * 100),\n  table_share: Math.round((ok.filter(c => c.table_count > 0).length / ok.length) * 100),\n  schema_type_frequency: schemaFreq\n} : {\n  pages_analyzed: 0,\n  pages_failed: competitors.length,\n  median_word_count: null, median_h2_count: null,\n  median_internal_links: null, median_external_links: null,\n  median_image_count: null, median_video_count: null,\n  faq_section_share: 0, table_share: 0, schema_type_frequency: {}\n};\n\nreturn [{\n  json: {\n    ...inputs,\n    your_page: yourPage,\n    competitors,\n    aggregate\n  }\n}];\n"
+      },
+      "id": "f8a9b0c1-d2e3-4f4a-5b6c-7d8e9f0a1b2c",
+      "name": "Aggregate Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const inp = $input.first().json;\nconst hasYourPage = !!(inp.your_page && inp.your_page.url);\n\nfunction compactForPrompt(p, isYou) {\n  return {\n    label: isYou ? 'YOUR_PAGE' : 'COMPETITOR',\n    url: p.url,\n    domain: p.domain,\n    title: p.title,\n    title_length: p.title_length,\n    h1: p.h1,\n    meta_description: p.meta_description,\n    meta_description_length: p.meta_description_length,\n    word_count: p.word_count,\n    heading_counts: p.heading_counts,\n    headings_outline: (p.headings_outline || []).slice(0, 40).map(h => '  '.repeat(Math.max(0, h.level - 1)) + 'H' + h.level + ': ' + h.text),\n    internal_links: p.internal_links,\n    external_links: p.external_links,\n    image_count: p.image_count,\n    video_count: p.video_count,\n    table_count: p.table_count,\n    list_count: p.list_count,\n    has_faq_section: p.has_faq_section,\n    schema_types: p.schema_types,\n    error: p.error || undefined\n  };\n}\n\n// Branch system prompt based on whether user provided their own page\nconst systemPrompt = hasYourPage ? [\n  \"You are a senior SEO analyst doing a competitive SERP teardown. The user is trying to rank a specific page (YOUR_PAGE) for a target keyword and has given you the top SERP competitors they want benchmarked against. Your job: surface what the top rankers have in common, identify what the user's page already does well, and call out the concrete gaps the user must close.\",\n  '',\n  'GROUNDING RULES (non-negotiable):',\n  '1. Use only what is in the <data> blocks. Do not invent headings, schema types, word counts, or features that are not in the signals.',\n  '2. \"Common patterns\" = signals that appear on AT LEAST 60% of the competitors AND that meaningfully differentiate top rankers from average pages. Examples: presence of a comparison table, FAQ section with PAA-style questions, specific schema types (FAQPage, HowTo, Product), specific recurring H2 themes, average word count band, presence of original imagery/diagrams.',\n  '3. \"Gaps\" = something present in the majority of competitors and absent (or weak) in YOUR_PAGE. Each gap MUST cite at least one competitor URL as evidence. Sort by impact (P0 first).',\n  '4. \"Strengths\" = something YOUR_PAGE already does that the majority of competitors also do. Acknowledge what is working before piling on fixes.',\n  '5. \"Standout signals\" = noteworthy things that 1-2 top rankers do that others do NOT, that could explain why they rank higher. Frame these as \"experiments to consider\", not as required actions.',\n  '6. \"Recommendations\" = concrete actions, prioritized P0/P1/P2. Every P0 must trace back to a gap. Be specific: \"Add an FAQ section with at least 4 of these PAA questions: ...\" beats \"Add an FAQ section\".',\n  '7. Title + meta comparison: propose a rewritten title and meta description for YOUR_PAGE that incorporates the keyword as competitors do, respects character limits (title ~55-60, meta ~150-160), and matches the SERP intent. Only suggest if there is a clear improvement; otherwise return the existing title/meta and set their \"needs_change\" to false.',\n  '8. Be honest. If the analyzed set is too small or the user\\'s page already covers everything, say so in the summary and keep gaps short.',\n  '',\n  'OUTPUT: valid JSON only. No markdown fences, no prose outside JSON. Schema EXACTLY:',\n  '{',\n  '  \"summary\": \"2-3 sentence positioning: what the SERP rewards + how YOUR_PAGE stacks up overall\",',\n  '  \"serp_archetype\": \"How-to article | Listicle | Comparison | Review | Product page | Service page | Glossary | Local landing | Homepage | Other\",',\n  '  \"common_patterns\": [ { \"pattern\": \"short label\", \"detail\": \"1-2 sentences\", \"frequency\": \"X of N competitors\", \"evidence_urls\": [\"...\"] } ],',\n  '  \"your_strengths\": [ { \"strength\": \"short label\", \"detail\": \"1 sentence\" } ],',\n  '  \"gaps\": [ { \"area\": \"short label\", \"detail\": \"what is missing or weak on YOUR_PAGE\", \"severity\": \"P0|P1|P2\", \"evidence_urls\": [\"...\"], \"competitor_examples\": [\"1 short phrase from each evidence URL showing how they handle it\"] } ],',\n  '  \"standout_signals\": [ { \"signal\": \"short label\", \"detail\": \"1-2 sentences\", \"seen_on\": [\"...\"] } ],',\n  '  \"recommendations\": [ { \"priority\": \"P0|P1|P2\", \"action\": \"imperative sentence telling user exactly what to do\", \"why\": \"1 sentence tying to gap or pattern\", \"linked_gap\": \"matching gaps[].area or null\" } ],',\n  '  \"meta_comparison\": {',\n  '    \"your_title\": \"...\", \"your_title_length\": N,',\n  '    \"suggested_title\": \"...\", \"title_needs_change\": true|false,',\n  '    \"your_meta_description\": \"...\", \"your_meta_description_length\": N,',\n  '    \"suggested_meta_description\": \"...\", \"meta_needs_change\": true|false',\n  '  },',\n  '  \"content_depth_verdict\": \"ahead | on par | behind\",',\n  '  \"target_word_count\": \"X-Y words (anchored to competitor median ± 15%)\"',\n  '}'\n].join('\\n') : [\n  \"You are a senior SEO analyst doing a competitive SERP teardown. The user wants to understand what the top rankers for a keyword have in common, so they can create a new page that competes effectively. Your job: surface common patterns, standout signals, and concrete recommendations for what a new page should include.\",\n  '',\n  'GROUNDING RULES (non-negotiable):',\n  '1. Use only what is in the <data> blocks. Do not invent headings, schema types, word counts, or features that are not in the signals.',\n  '2. \"Common patterns\" = signals that appear on AT LEAST 60% of the competitors AND that meaningfully differentiate top rankers from average pages. Examples: presence of a comparison table, FAQ section with PAA-style questions, specific schema types (FAQPage, HowTo, Product), specific recurring H2 themes, average word count band, presence of original imagery/diagrams.',\n  '3. \"Standout signals\" = noteworthy things that 1-2 top rankers do that others do NOT, that could explain why they rank higher. Frame these as \"experiments to consider\", not as required actions.',\n  '4. \"Recommendations\" = concrete actions for a NEW page entering this SERP, prioritized P0/P1/P2. Be specific: \"Include an FAQ section with at least 4 of these PAA questions: ...\" beats \"Add an FAQ section\". Recommend what content structure, schema, and depth a new page should have to compete.',\n  '5. Do NOT include gaps, strengths, meta_comparison, or content_depth_verdict — there is no existing page to compare against.',\n  '6. Be honest. If the analyzed set is too small, say so in the summary.',\n  '',\n  'OUTPUT: valid JSON only. No markdown fences, no prose outside JSON. Schema EXACTLY:',\n  '{',\n  '  \"summary\": \"2-3 sentence positioning: what the SERP rewards + what a new page should focus on\",',\n  '  \"serp_archetype\": \"How-to article | Listicle | Comparison | Review | Product page | Service page | Glossary | Local landing | Homepage | Other\",',\n  '  \"common_patterns\": [ { \"pattern\": \"short label\", \"detail\": \"1-2 sentences\", \"frequency\": \"X of N competitors\", \"evidence_urls\": [\"...\"] } ],',\n  '  \"standout_signals\": [ { \"signal\": \"short label\", \"detail\": \"1-2 sentences\", \"seen_on\": [\"...\"] } ],',\n  '  \"recommendations\": [ { \"priority\": \"P0|P1|P2\", \"action\": \"imperative sentence telling user exactly what to do\", \"why\": \"1 sentence tying to pattern or standout signal\" } ],',\n  '  \"target_word_count\": \"X-Y words (anchored to competitor median ± 15%)\"',\n  '}'\n].join('\\n');\n\nconst userLines = [\n  'TARGET KEYWORD: ' + inp.keyword,\n  'LOCATION: ' + inp.location,\n  'LANGUAGE: ' + inp.language,\n  '',\n  '<data label=\"AGGREGATE_SIGNALS\">',\n  JSON.stringify(inp.aggregate, null, 2),\n  '</data>'\n];\n\nif (hasYourPage) {\n  userLines.push(\n    '',\n    '<data label=\"YOUR_PAGE\">',\n    JSON.stringify(compactForPrompt(inp.your_page, true), null, 2),\n    '</data>'\n  );\n}\n\nuserLines.push(\n  '',\n  '<data label=\"COMPETITORS\">',\n  JSON.stringify(inp.competitors.map(c => compactForPrompt(c, false)), null, 2),\n  '</data>'\n);\n\nif (inp.paa && inp.paa.length) {\n  userLines.push('', '<data label=\"PEOPLE_ALSO_ASK\">', inp.paa.map(p => '- ' + p).join('\\n'), '</data>');\n}\nif (inp.related_searches && inp.related_searches.length) {\n  userLines.push('', '<data label=\"RELATED_SEARCHES\">', inp.related_searches.map(p => '- ' + p).join('\\n'), '</data>');\n}\nuserLines.push('', 'Return the analysis as JSON exactly matching the schema in the system prompt.');\n\nreturn [{\n  json: {\n    ...inp,\n    llm_request: {\n      model: 'google/gemini-2.5-pro',\n      models: ['google/gemini-2.5-pro', 'google/gemini-2.5-flash'],\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userLines.join('\\n') }\n      ],\n      temperature: 0.25,\n      max_tokens: 16000,\n      reasoning: { effort: 'low' },\n      response_format: { type: 'json_object' }\n    }\n  }\n}];\n"
+      },
+      "id": "a9b0c1d2-e3f4-4a5b-6c7d-8e9f0a1b2c3d",
+      "name": "Build LLM Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://shettymarketing.local/on-page-seo"
+            },
+            {
+              "name": "X-Title",
+              "value": "On-Page SEO :: SERP Analysis"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.llm_request) }}",
+        "options": {
+          "timeout": 180000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "b0c1d2e3-f4a5-4b6c-7d8e-9f0a1b2c3d4e",
+      "name": "OpenRouter Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1856,
+        368
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const upstream = $('Build LLM Payload').first().json;\nconst response = $input.first().json;\n\nconst your_page = upstream.your_page || {};\nconst aggregate = upstream.aggregate || {};\nconst hasYourPage = !!(upstream.your_url || your_page.url);\n\nconst skeleton = {\n  summary: '',\n  serp_archetype: '',\n  common_patterns: [],\n  your_strengths: hasYourPage ? [] : undefined,\n  gaps: hasYourPage ? [] : undefined,\n  standout_signals: [],\n  recommendations: [],\n  meta_comparison: hasYourPage ? {\n    your_title: your_page.title || '',\n    your_title_length: your_page.title_length || 0,\n    suggested_title: '',\n    title_needs_change: false,\n    your_meta_description: your_page.meta_description || '',\n    your_meta_description_length: your_page.meta_description_length || 0,\n    suggested_meta_description: '',\n    meta_needs_change: false\n  } : undefined,\n  content_depth_verdict: hasYourPage ? '' : undefined,\n  target_word_count: aggregate.median_word_count\n    ? Math.round(aggregate.median_word_count * 0.85) + '-' + Math.round(aggregate.median_word_count * 1.15) + ' words (anchored to competitor median)'\n    : ''\n};\n\nlet analysis = skeleton;\nlet ai_error = null;\nlet ai_debug = null;\n\nif (response && response.error) {\n  ai_error = 'OpenRouter error: ' + (response.error.message || response.error.code || JSON.stringify(response.error));\n  ai_debug = { kind: 'error_field', error: response.error };\n} else {\n  const choice = response && response.choices && response.choices[0];\n  // OpenRouter sometimes nests upstream provider errors at choices[0].error\n  // (e.g. Gemini 2.5 Pro \"Upstream idle timeout exceeded\" when thinking takes too long).\n  if (choice && choice.error) {\n    const cerr = choice.error;\n    ai_error = 'Upstream provider error: ' + (cerr.message || cerr.code || JSON.stringify(cerr));\n    ai_debug = { kind: 'choice_error', error: cerr, finish_reason: choice.finish_reason, native_finish_reason: choice.native_finish_reason };\n  } else {\n  const text = choice && choice.message && choice.message.content;\n  if (!text) {\n    const finishReason = choice && choice.finish_reason;\n    const usage = response && response.usage;\n    ai_error = 'No content in OpenRouter response (finish_reason: ' + (finishReason || 'unknown') + ')';\n    ai_debug = {\n      kind: 'empty_content',\n      response_keys: response ? Object.keys(response) : [],\n      finish_reason: finishReason,\n      usage,\n      first_choice_keys: choice ? Object.keys(choice) : [],\n      message_keys: (choice && choice.message) ? Object.keys(choice.message) : [],\n      raw_response_preview: JSON.stringify(response || {}).slice(0, 3000)\n    };\n  } else {\n    let parsed;\n    try { parsed = JSON.parse(text); }\n    catch (e) {\n      const cleaned = text.replace(/^```json\\s*/i, '').replace(/```\\s*$/, '').trim();\n      try { parsed = JSON.parse(cleaned); }\n      catch (e2) {\n        ai_error = 'Failed to parse JSON from model';\n        analysis = { ...skeleton, raw_text: text };\n        ai_debug = { kind: 'parse_fail', text_preview: text.slice(0, 1000) };\n      }\n    }\n    if (parsed) analysis = { ...skeleton, ...parsed };\n  }\n  }\n}\n\nreturn [{\n  json: {\n    keyword: upstream.keyword,\n    your_url: upstream.your_url || '',\n    location: upstream.location,\n    language: upstream.language,\n    your_page: hasYourPage ? your_page : null,\n    competitors: upstream.competitors,\n    aggregate,\n    ...analysis,\n    ai_model: 'google/gemini-2.5-pro',\n    generated_at: new Date().toISOString(),\n    ...(ai_error ? { ai_error } : {}),\n    ...(ai_debug ? { ai_debug } : {})\n  }\n}];\n"
+      },
+      "id": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f6a",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2272,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## How the fan-out works\n\n**Build URL List** emits N+1 items (your_url + competitors).\n\n**Firecrawl Scrape** runs once per item — n8n auto-parallelizes child branches. Per-item failures are caught by `onError: continueRegularOutput` + `neverError: true`.\n\n**Extract Signals** runs per item, reading the upstream item's URL via `$('Build URL List').item.json.url` to keep provenance.\n\n**Aggregate Signals** uses `$input.all()` to collect every per-URL extraction back into a single item, then computes medians + shares for competitors only (your_page is held aside).\n\n**Resilience:** A single bad scrape becomes `{ error: ... }` on its row. Aggregate counts only `pages_failed`. The LLM gets the partial set and the analysis still ships.",
+        "height": 360,
+        "width": 380,
+        "color": 5
+      },
+      "id": "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6a7b",
+      "name": "Fan-out Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Test?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Test?": {
+      "main": [
+        [
+          {
+            "node": "Respond Test OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Build URL List",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build URL List": {
+      "main": [
+        [
+          {
+            "node": "Firecrawl Scrape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Firecrawl Scrape": {
+      "main": [
+        [
+          {
+            "node": "Extract Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Signals": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Signals": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Payload": {
+      "main": [
+        [
+          {
+            "node": "OpenRouter Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat": {
+      "main": [
+        [
+          {
+            "node": "Parse LLM Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse LLM Response": {
+      "main": [
+        [
+          {
+            "node": "Respond with Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "sa-analyze-v1",
+  "meta": {},
+  "id": "serpAnalysisAnalyze001",
+  "tags": []
+}

@@ -1,0 +1,1554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marketing Insights — Shetty Marketing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --brand-navy: #1f3a68;
+    --brand-navy-2: #2c4f81;
+    --brand-sky: #1fb1f5;
+    --brand-yellow: #ffdc27;
+    --brand-ink: #1c1b1b;
+
+    --navy-50: #eaf1f8;
+    --navy-100: #d6e4f3;
+    --navy-700: #1f3a68;
+    --navy-900: #0e1f3a;
+
+    --sky-100: #d6f0fc;
+    --sky-300: #6dcaf6;
+    --sky-500: #1fb1f5;
+    --sky-700: #0b87c0;
+
+    --yellow-300: #ffe864;
+    --yellow-500: #ffdc27;
+
+    --accent-orange: #f1631c;
+    --accent-maroon: #6b1f24;
+
+    --gray-900: #1c1b1b;
+    --gray-700: #4a4a4a;
+    --gray-500: #7d7d7d;
+    --gray-400: #a8a8a8;
+    --gray-300: #d4d4d4;
+    --gray-200: #e6e6e6;
+    --gray-100: #f1f1ef;
+    --gray-50: #f8f8f6;
+
+    --font-sans: 'Montserrat', system-ui, -apple-system, sans-serif;
+    --font-mono: 'SF Mono', Menlo, Consolas, monospace;
+
+    --shadow-sm: 0 2px 6px rgba(14,31,58,0.06);
+    --shadow-md: 0 8px 24px rgba(14,31,58,0.08);
+    --shadow-lg: 0 18px 48px rgba(14,31,58,0.12);
+
+    --ease: cubic-bezier(0.22,1,0.36,1);
+    --dur-fast: 140ms;
+    --dur: 220ms;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-sans);
+    background: var(--gray-50);
+    color: var(--brand-ink);
+    font-size: 14.5px;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ── Top nav ────────────────────────────────────────── */
+  .topbar {
+    background: var(--brand-navy);
+    padding: 0 28px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(14,31,58,0.25);
+  }
+  .topbar-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    height: 58px;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; }
+  .topbar-logo {
+    width: 30px; height: 30px;
+    background: var(--brand-sky);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 14px;
+    color: #fff;
+    letter-spacing: -0.03em;
+  }
+  .topbar-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .topbar-title small {
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .topbar-nav { display: flex; gap: 4px; align-items: center; }
+  .topbar-nav a {
+    color: rgba(255,255,255,0.7);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .topbar-nav a:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .topbar-nav a.active {
+    background: rgba(31,177,245,0.18);
+    color: #fff;
+    box-shadow: inset 0 -2px 0 var(--brand-sky);
+  }
+
+  /* ── Page wrap ──────────────────────────────────────── */
+  .page-wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px 80px;
+    width: 100%;
+    flex: 1;
+  }
+
+  /* ── Hero ───────────────────────────────────────────── */
+  .hero {
+    padding: 48px 0 32px;
+    margin-bottom: 32px;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--sky-100);
+    border: 1.5px solid var(--sky-300);
+    border-radius: 999px;
+    padding: 5px 14px 5px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--brand-sky);
+    margin-bottom: 18px;
+  }
+  .hero-eyebrow-dot {
+    width: 7px; height: 7px;
+    background: var(--brand-sky);
+    border-radius: 50%;
+  }
+  .hero h1 {
+    font-size: clamp(2rem, 4.5vw, 3rem);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.05;
+    color: var(--brand-ink);
+  }
+  .hero h1 span { color: var(--brand-sky); }
+  .hero-sub {
+    margin-top: 14px;
+    font-size: 15px;
+    color: var(--gray-500);
+    max-width: 640px;
+  }
+
+  /* ── Section heads ──────────────────────────────────── */
+  .section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin: 40px 0 20px;
+    gap: 16px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--brand-sky);
+    margin-bottom: 4px;
+  }
+  .section-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--brand-ink);
+  }
+  .section-rule {
+    flex: 1;
+    height: 1px;
+    background: var(--gray-200);
+    margin-bottom: 6px;
+  }
+  .section-sub {
+    font-size: 13px;
+    color: var(--gray-500);
+    margin-top: 2px;
+  }
+
+  /* ── Cards ──────────────────────────────────────────── */
+  .card {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  /* ── Settings collapsible ───────────────────────────── */
+  details.settings {
+    background: #fff;
+    border: 1px dashed var(--gray-300);
+    border-radius: 12px;
+    padding: 12px 18px;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  }
+  details.settings[open] {
+    padding-bottom: 18px;
+    background: var(--gray-50);
+    border-color: var(--gray-200);
+    border-style: solid;
+  }
+  details.settings summary {
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--brand-ink);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    list-style: none;
+    padding: 6px 0;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  details.settings summary::-webkit-details-marker { display: none; }
+  details.settings summary::before {
+    content: "+";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--gray-500);
+    transition: transform var(--dur) var(--ease);
+  }
+  details.settings[open] summary::before {
+    content: "\2212";
+    background: var(--brand-sky);
+    color: #fff;
+    border-color: var(--brand-sky);
+  }
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr auto auto;
+    gap: 14px;
+    align-items: center;
+    margin-top: 18px;
+  }
+  .settings-grid label {
+    font-weight: 700;
+    font-size: 12.5px;
+    color: var(--brand-ink);
+  }
+  .settings-grid small {
+    color: var(--gray-500);
+    font-size: 11.5px;
+    font-weight: 500;
+    display: block;
+    margin-top: 2px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: var(--gray-100);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    white-space: nowrap;
+    min-width: 110px;
+    justify-content: center;
+  }
+  .status-chip .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--gray-400);
+    flex-shrink: 0;
+  }
+  .status-chip.ok { background: var(--sky-100); color: var(--sky-700); }
+  .status-chip.ok .dot { background: var(--brand-sky); box-shadow: 0 0 0 3px rgba(31,177,245,0.2); }
+  .status-chip.fail { background: #fee4e2; color: var(--accent-maroon); }
+  .status-chip.fail .dot { background: #d92d20; }
+  .status-chip.testing { background: var(--yellow-300); color: #6b5b00; }
+  .status-chip.testing .dot {
+    background: #6b5b00;
+    animation: pulse 1s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.3); }
+  }
+
+  /* ── Inputs ─────────────────────────────────────────── */
+  input[type="text"], input[type="url"], textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-family: var(--font-mono);
+    background: #fff;
+    color: var(--brand-ink);
+    outline: none;
+    transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  }
+  input:focus, textarea:focus {
+    border-color: var(--brand-sky);
+    box-shadow: 0 0 0 4px rgba(31,177,245,0.14);
+  }
+  textarea {
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.55;
+    font-family: var(--font-sans);
+  }
+
+  /* ── Buttons ────────────────────────────────────────── */
+  .btn {
+    font-family: var(--font-sans);
+    cursor: pointer;
+    border: none;
+    font-weight: 700;
+    padding: 11px 22px;
+    border-radius: 999px;
+    font-size: 13.5px;
+    transition: transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+  .btn-primary {
+    background: var(--brand-yellow);
+    color: var(--brand-ink);
+    box-shadow: 0 6px 18px rgba(255,220,39,0.3);
+  }
+  .btn-primary:hover { box-shadow: 0 10px 26px rgba(255,220,39,0.45); }
+  .btn-sky {
+    background: var(--brand-sky);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(31,177,245,0.3);
+  }
+  .btn-navy {
+    background: var(--brand-navy);
+    color: #fff;
+    box-shadow: 0 6px 18px rgba(31,58,104,0.18);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--brand-ink);
+    border: 1.5px solid var(--gray-300);
+    padding: 10px 21px;
+  }
+  .btn-ghost:hover {
+    border-color: var(--brand-sky);
+    color: var(--brand-sky);
+  }
+  .btn-sm { padding: 8px 16px; font-size: 12.5px; }
+
+  /* ── Chat ───────────────────────────────────────────── */
+  .chat-card {
+    padding: 0;
+    overflow: hidden;
+  }
+  .chat-toolbar-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--gray-100);
+    background: var(--gray-50);
+  }
+  .chat-toolbar-top .meta {
+    font-size: 11.5px;
+    color: var(--gray-500);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .meta .live-dot {
+    width: 7px; height: 7px;
+    background: var(--brand-sky);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(31,177,245,0.18);
+  }
+  .chat-messages {
+    padding: 22px 24px;
+    min-height: 280px;
+    max-height: 560px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .chat-empty {
+    color: var(--gray-500);
+    font-size: 14px;
+    text-align: center;
+    padding: 56px 20px;
+    border: 1.5px dashed var(--gray-200);
+    border-radius: 14px;
+    margin: 8px 0;
+  }
+  .chat-empty-title {
+    color: var(--brand-ink);
+    font-weight: 700;
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+  .chat-empty .examples {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center;
+    margin-top: 18px;
+  }
+  .example-chip {
+    background: var(--sky-100);
+    border: 1px solid var(--sky-300);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--sky-700);
+    transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  }
+  .example-chip:hover {
+    background: var(--brand-sky);
+    color: #fff;
+    transform: translateY(-1px);
+  }
+
+  .msg { display: flex; gap: 12px; align-items: flex-start; }
+  .msg .avatar {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.02em;
+  }
+  .msg.user .avatar { background: var(--brand-navy); }
+  .msg.assistant .avatar { background: var(--brand-sky); }
+  .msg .bubble {
+    flex: 1;
+    min-width: 0;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .msg.user .bubble {
+    background: var(--navy-50);
+    border-color: var(--navy-100);
+  }
+  .msg .bubble p { margin: 0 0 10px; }
+  .msg .bubble p:last-child { margin-bottom: 0; }
+  .msg .bubble a { color: var(--sky-700); text-decoration: underline; text-underline-offset: 2px; }
+  .msg .bubble code {
+    background: var(--navy-50);
+    color: var(--brand-navy);
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    font-family: var(--font-mono);
+  }
+  .msg .bubble strong { font-weight: 700; }
+  .msg .bubble .citemark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--brand-sky);
+    color: #fff;
+    border-radius: 5px;
+    font-size: 10.5px;
+    font-weight: 800;
+    margin: 0 2px;
+    vertical-align: 1px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  }
+  .msg .bubble .citemark:hover {
+    background: var(--sky-700);
+    transform: translateY(-1px);
+  }
+
+  .citations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--gray-200);
+  }
+  .citation {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px 5px 6px;
+    border: 1px solid var(--gray-200);
+    border-radius: 999px;
+    background: #fff;
+    font-size: 11.5px;
+    color: var(--brand-ink);
+    text-decoration: none;
+    max-width: 340px;
+    font-weight: 500;
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  }
+  .citation:hover { background: var(--sky-100); border-color: var(--brand-sky); }
+  .citation .num {
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    background: var(--brand-sky);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10.5px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .citation .src {
+    color: var(--gray-500);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+  .citation .ttl {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .typing { display: inline-flex; gap: 5px; padding: 4px 2px; }
+  .typing span {
+    width: 7px; height: 7px;
+    background: var(--brand-sky);
+    border-radius: 50%;
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+    40% { transform: translateY(-5px); opacity: 1; }
+  }
+
+  .chat-input-wrap {
+    border-top: 1px solid var(--gray-200);
+    padding: 16px 18px;
+    background: #fff;
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  .chat-input-wrap textarea {
+    flex: 1;
+    min-height: 46px;
+    max-height: 160px;
+    border-radius: 999px;
+    padding: 13px 18px;
+    background: var(--gray-50);
+    border-color: var(--gray-200);
+    font-family: var(--font-sans);
+    font-size: 14px;
+  }
+  .chat-input-wrap textarea:focus { background: #fff; }
+  .chat-input-wrap .btn { height: 46px; padding: 0 22px; }
+  .chat-toolbar-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px 14px;
+    font-size: 11.5px;
+    color: var(--gray-400);
+    font-weight: 500;
+  }
+
+  /* ── Feed ───────────────────────────────────────────── */
+  .feed-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 14px;
+    border: 1px solid var(--gray-200);
+    border-radius: 999px;
+    background: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--gray-700);
+    font-weight: 700;
+    font-family: var(--font-sans);
+    letter-spacing: 0.02em;
+    transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  }
+  .filter-chip .swatch {
+    width: 8px; height: 8px; border-radius: 2px;
+  }
+  .filter-chip.active {
+    background: var(--brand-navy);
+    border-color: var(--brand-navy);
+    color: #fff;
+  }
+  .filter-chip.active .swatch { box-shadow: 0 0 0 2px rgba(255,255,255,0.4); }
+  .filter-chip:not(.active):hover { border-color: var(--brand-sky); color: var(--brand-sky); }
+  .feed-meta {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--gray-500);
+    font-family: var(--font-mono);
+  }
+  .feed-meta-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+    min-height: 16px;
+  }
+  .feed-meta-wrap .feed-meta { margin-left: 0; }
+
+  .feed-group { margin-bottom: 32px; }
+  .feed-group:last-child { margin-bottom: 0; }
+  .feed-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .feed-group-title {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--brand-navy);
+    margin: 0;
+  }
+  .feed-group-sub {
+    font-size: 12px;
+    color: var(--gray-500);
+    font-weight: 500;
+  }
+  .feed-group-count {
+    margin-left: auto;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .feed-group-empty {
+    grid-column: 1 / -1;
+    padding: 18px;
+    border: 1.5px dashed var(--gray-300);
+    border-radius: 12px;
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 13px;
+    background: #fff;
+  }
+
+  .feed-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 14px;
+  }
+  .feed-item {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 14px;
+    padding: 18px 20px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+    position: relative;
+    overflow: hidden;
+  }
+  .feed-item:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--sky-300);
+  }
+  .feed-item.fb-tile {
+    background: linear-gradient(135deg, var(--navy-50), var(--sky-100));
+    border: 1.5px dashed var(--navy-200, #a9c2dd);
+    grid-column: span 2;
+  }
+  .feed-item-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .source-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .source-pill .swatch { width: 5px; height: 5px; background: #fff; border-radius: 50%; opacity: 0.85; }
+  .feed-item-date {
+    font-size: 11px;
+    color: var(--gray-500);
+    font-family: var(--font-mono);
+    font-weight: 500;
+    margin-left: auto;
+  }
+  .feed-item-title {
+    font-size: 15.5px;
+    font-weight: 700;
+    color: var(--brand-ink);
+    line-height: 1.4;
+    letter-spacing: -0.005em;
+  }
+  .feed-item-excerpt {
+    font-size: 13px;
+    color: var(--gray-500);
+    line-height: 1.5;
+  }
+  .feed-item-tag {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-orange);
+    background: #fde8d9;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 800;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--gray-100) 0%, var(--gray-50) 50%, var(--gray-100) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s infinite linear;
+    border-radius: 6px;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  .skeleton-item {
+    padding: 18px 20px;
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 14px;
+  }
+  .skeleton-line { height: 12px; margin-bottom: 10px; }
+  .skeleton-line.w-30 { width: 30%; }
+  .skeleton-line.w-80 { width: 80%; }
+  .skeleton-line.w-60 { width: 60%; }
+
+  /* ── Notices / errors ───────────────────────────────── */
+  .error {
+    background: #fee4e2;
+    color: var(--accent-maroon);
+    border: 1px solid #fab7b2;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .notice {
+    background: #fef9c3;
+    border: 1px solid var(--yellow-300);
+    color: #6b5b00;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .notice strong { color: var(--brand-ink); }
+
+  /* ── Sources list ───────────────────────────────────── */
+  .sources-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+  }
+
+  /* ── Footer ─────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--gray-200);
+    padding: 20px 28px;
+    max-width: 1180px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--gray-500);
+    font-weight: 500;
+  }
+  footer .foot-brand { display: flex; align-items: center; gap: 8px; }
+  footer .foot-logo {
+    width: 18px; height: 18px;
+    background: var(--brand-sky);
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 900;
+  }
+
+  /* ── Mobile ─────────────────────────────────────────── */
+  @media (max-width: 760px) {
+    .topbar { padding: 0 18px; }
+    .topbar-nav { display: none; }
+    .topbar-title small { display: none; }
+    .page-wrap { padding: 0 18px 48px; }
+    .hero { padding: 32px 0 24px; margin-bottom: 24px; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .chat-input-wrap { flex-direction: column; align-items: stretch; }
+    .chat-input-wrap .btn { width: 100%; height: 44px; }
+    .feed-list { grid-template-columns: 1fr; }
+    .feed-item.fb-tile { grid-column: span 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top nav -->
+<nav class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-brand" href="https://shettymarketing.com/SEO%20suite/index.html">
+      <div class="topbar-logo">SM</div>
+      <span class="topbar-title">Marketing Suite <small>/ Marketing Insights</small></span>
+    </a>
+    <nav class="topbar-nav">
+      <a href="https://shettymarketing.com/SEO%20suite/index.html">Suite</a>
+      <a href="https://shettymarketing.com/on-page/">On-Page</a>
+      <a href="https://shettymarketing.com/off-page-seo/">Off-Page</a>
+      <a href="#" class="active">Insights</a>
+    </nav>
+  </div>
+</nav>
+
+<div class="page-wrap">
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-eyebrow">
+      <span class="hero-eyebrow-dot"></span>
+      Research assistant
+    </div>
+    <h1>Marketing Insights, with <span>citations.</span></h1>
+    <p class="hero-sub">Ask one question. Get a cited answer up top, plus what Reddit, YouTubers, my Nifty workspace, and my Google Drive have to say on it below — all in one place.</p>
+  </header>
+
+  <!-- Settings -->
+  <details class="settings" id="settings">
+    <summary>Webhook settings <span style="color: var(--gray-400); font-weight: 600; margin-left: 4px; text-transform: none; letter-spacing: 0;">— n8n endpoints</span></summary>
+    <div class="settings-grid">
+      <label for="chat-url">Chat webhook URL<small>POST endpoint returning <code>{ answer, citations[] }</code></small></label>
+      <input id="chat-url" type="url" placeholder="https://your-n8n.example/webhook/seo-insights-chat" />
+      <button id="chat-test" class="btn btn-ghost btn-sm" type="button">Test</button>
+      <span id="chat-test-status" class="status-chip"><span class="dot"></span><span class="label">Not tested</span></span>
+
+      <label for="feed-url">Feed webhook URL<small>GET endpoint returning <code>{ items[] }</code></small></label>
+      <input id="feed-url" type="url" placeholder="https://your-n8n.example/webhook/seo-insights-feed" />
+      <button id="feed-test" class="btn btn-ghost btn-sm" type="button">Test</button>
+      <span id="feed-test-status" class="status-chip"><span class="dot"></span><span class="label">Not tested</span></span>
+    </div>
+    <div style="margin-top: 16px; display: flex; gap: 10px; align-items: center;">
+      <button id="settings-save" class="btn btn-navy btn-sm">Save URLs</button>
+      <span id="settings-saved-msg" style="color: var(--brand-sky); font-size: 12px; font-weight: 700;"></span>
+    </div>
+  </details>
+
+  <!-- Chat -->
+  <div class="section-head" id="chat">
+    <div>
+      <div class="section-label">01 — Conversation</div>
+      <div class="section-title">Chat</div>
+      <div class="section-sub">Answers cite only the configured sources. FB group is surfaced manually below.</div>
+    </div>
+    <div class="section-rule"></div>
+    <button id="chat-clear" class="btn btn-ghost btn-sm">New conversation</button>
+  </div>
+
+  <div class="card chat-card">
+    <div class="chat-toolbar-top">
+      <span class="meta"><span class="live-dot"></span>Search-augmented · n8n + OpenRouter</span>
+      <span id="chat-status" style="font-size: 11.5px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em;">Ready</span>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-empty" id="chat-empty">
+        <div class="chat-empty-title">Ask anything about SEO</div>
+        Answers pull from your configured sources with inline citations.
+        <div class="examples">
+          <span class="example-chip">What's the latest on E-E-A-T for local SEO?</span>
+          <span class="example-chip">How do I audit a sudden traffic drop?</span>
+          <span class="example-chip">Internal linking best practices in 2026</span>
+          <span class="example-chip">Are PBNs still risky?</span>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-wrap">
+      <textarea id="chat-input" placeholder="Ask a question. Shift+Enter for a new line." rows="1"></textarea>
+      <button id="chat-send" class="btn btn-primary">Send ✦</button>
+    </div>
+    <div class="chat-toolbar-bottom">
+      <span>Enter to send · Shift+Enter for newline</span>
+    </div>
+  </div>
+
+  <!-- Per-source results, driven by the chat query -->
+  <div class="section-head" id="feed">
+    <div>
+      <div class="section-label">02 — Source breakdown</div>
+      <div class="section-title">Results by source</div>
+      <div class="section-sub">Ask a question above. Each section below shows what that source has on it.</div>
+    </div>
+    <div class="section-rule"></div>
+  </div>
+
+  <div class="feed-meta-wrap"><span class="feed-meta" id="feed-meta"></span></div>
+
+  <!-- Group: Reddit -->
+  <div class="feed-group" id="feed-group-reddit">
+    <div class="feed-group-head">
+      <h3 class="feed-group-title">What Reddit says</h3>
+      <span class="feed-group-sub">Top threads matching your question across Reddit.</span>
+      <span class="feed-group-count" id="feed-count-reddit"></span>
+    </div>
+    <div class="feed-list" id="feed-list-reddit"></div>
+  </div>
+
+  <!-- Group: YouTubers -->
+  <div class="feed-group" id="feed-group-youtube">
+    <div class="feed-group-head">
+      <h3 class="feed-group-title">What YouTubers say</h3>
+      <span class="feed-group-sub">Top YouTube videos matching your question.</span>
+      <span class="feed-group-count" id="feed-count-youtube"></span>
+    </div>
+    <div class="feed-list" id="feed-list-youtube"></div>
+  </div>
+
+  <!-- Group: Nifty -->
+  <div class="feed-group" id="feed-group-nifty">
+    <div class="feed-group-head">
+      <h3 class="feed-group-title">What I've mentioned in Nifty</h3>
+      <span class="feed-group-sub">Tasks and project discussions from my NiftyPM that match your question.</span>
+      <span class="feed-group-count" id="feed-count-nifty"></span>
+    </div>
+    <div class="feed-list" id="feed-list-nifty"></div>
+  </div>
+
+  <!-- Group: Google Drive -->
+  <div class="feed-group" id="feed-group-drive">
+    <div class="feed-group-head">
+      <h3 class="feed-group-title">What I have on Google Drive</h3>
+      <span class="feed-group-sub">Docs, sheets, and decks from my Drive that mention your question.</span>
+      <span class="feed-group-count" id="feed-count-drive"></span>
+    </div>
+    <div class="feed-list" id="feed-list-drive"></div>
+  </div>
+
+  <!-- Sources -->
+  <div class="section-head" id="sources">
+    <div>
+      <div class="section-label">03 — Reference</div>
+      <div class="section-title">Sources</div>
+      <div class="section-sub">The six sources powering chat answers and the feed.</div>
+    </div>
+    <div class="section-rule"></div>
+  </div>
+  <div class="sources-grid" id="sources-list"></div>
+
+</div>
+
+<footer>
+  <div class="foot-brand">
+    <span class="foot-logo">SM</span>
+    <span>© 2026 · Shetty Marketing</span>
+  </div>
+  <span>v0.2 · n8n-powered</span>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  const SOURCES = [
+    { id: 'sej',     label: 'Search Engine Journal',            short: 'SEJ',          color: '#e8552f', kind: 'web',
+      url: 'https://www.searchenginejournal.com/category/seo/',
+      note: 'Daily SEO news + tactical guides.' },
+    { id: 'cmi',     label: 'Content Marketing Institute',      short: 'CMI',          color: '#f59e0b', kind: 'web',
+      url: 'https://contentmarketinginstitute.com/',
+      note: 'Content strategy + editorial frameworks.' },
+    { id: 'reddit',  label: 'r/seopub',                         short: 'r/seopub',     color: '#ff4500', kind: 'reddit',
+      url: 'https://www.reddit.com/r/seopub/',
+      note: 'Community discussion, anecdotal + practitioner.' },
+    { id: 'mysite',  label: 'My Blog',                          short: 'Blog',         color: '#1fb1f5', kind: 'web',
+      url: 'https://bunny-wp-pullzone-39ootodtxn.b-cdn.net/',
+      note: 'My own notes and case studies. Replace with canonical URL.' },
+    { id: 'grumpy',  label: 'Grumpy SEO Guy (YouTube)',         short: 'Grumpy SEO',   color: '#cc0000', kind: 'youtube',
+      url: 'https://www.youtube.com/@GrumpySEOGuy',
+      note: 'YouTube channel — practitioner SEO takes and breakdowns.' },
+    { id: 'pop',     label: 'PageOptimizer Pro Blog',           short: 'POP',          color: '#0d9488', kind: 'web',
+      url: 'https://www.pageoptimizer.pro/blog',
+      note: 'On-page optimization, NLP, and content scoring.' },
+    { id: 'si',      label: 'Search Intelligence Case Studies', short: 'Search Intel.', color: '#6b1f24', kind: 'web',
+      url: 'https://search-intelligence.co.uk/case-studies',
+      note: 'Digital PR case studies and link-building wins.' },
+    { id: 'fb',      label: 'Google SEO Mastermind (FB Group)', short: 'FB Group',     color: '#1f3a68', kind: 'fb',
+      url: 'https://www.facebook.com/groups/googleseomastermind',
+      note: 'Login required. Surfaced as a static link.' },
+    { id: 'nifty',   label: 'NiftyPM workspace',                short: 'Nifty',        color: '#7c3aed', kind: 'nifty',
+      url: 'https://app.niftypm.com/',
+      note: 'My projects, tasks, comments, and docs via the Nifty REST API.' },
+    { id: 'drive',   label: 'My Google Drive',                  short: 'Drive',        color: '#0f9d58', kind: 'drive',
+      url: 'https://drive.google.com/',
+      note: 'Recently modified Docs, Sheets, and Slides via the Drive API.' }
+  ];
+
+  const LS = { chat: 'si_chat_url', feed: 'si_feed_url' };
+
+  const $chatUrl = document.getElementById('chat-url');
+  const $feedUrl = document.getElementById('feed-url');
+  const $saveBtn = document.getElementById('settings-save');
+  const $savedMsg = document.getElementById('settings-saved-msg');
+  const $settings = document.getElementById('settings');
+
+  $chatUrl.value = localStorage.getItem(LS.chat) || '';
+  $feedUrl.value = localStorage.getItem(LS.feed) || '';
+
+  $saveBtn.addEventListener('click', () => {
+    localStorage.setItem(LS.chat, $chatUrl.value.trim());
+    localStorage.setItem(LS.feed, $feedUrl.value.trim());
+    $savedMsg.textContent = 'Saved.';
+    setTimeout(() => { $savedMsg.textContent = ''; }, 2200);
+  });
+
+  if (!$chatUrl.value && !$feedUrl.value) {
+    $settings.open = true;
+  }
+
+  /* ── Webhook test buttons ───────────────────────────── */
+  const $chatTestBtn    = document.getElementById('chat-test');
+  const $feedTestBtn    = document.getElementById('feed-test');
+  const $chatTestStatus = document.getElementById('chat-test-status');
+  const $feedTestStatus = document.getElementById('feed-test-status');
+
+  function setStatus($el, state, label) {
+    $el.classList.remove('ok', 'fail', 'testing');
+    if (state) $el.classList.add(state);
+    $el.querySelector('.label').textContent = label;
+  }
+
+  async function testChat() {
+    const url = ($chatUrl.value || '').trim();
+    if (!url) {
+      setStatus($chatTestStatus, 'fail', 'URL empty');
+      return;
+    }
+    setStatus($chatTestStatus, 'testing', 'Testing…');
+    $chatTestBtn.disabled = true;
+    try {
+      const t0 = performance.now();
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true })
+      });
+      const dt = Math.round(performance.now() - t0);
+      const text = await res.text();
+      if (!res.ok) {
+        setStatus($chatTestStatus, 'fail', 'HTTP ' + res.status);
+        return;
+      }
+      if (!text) {
+        setStatus($chatTestStatus, 'fail', 'Empty body');
+        return;
+      }
+      let body = null;
+      try { body = JSON.parse(text); } catch (e) {
+        setStatus($chatTestStatus, 'fail', 'Not JSON');
+        return;
+      }
+      if (body && body.ok) {
+        setStatus($chatTestStatus, 'ok', 'OK · ' + dt + 'ms');
+      } else {
+        setStatus($chatTestStatus, 'ok', 'Reached · ' + dt + 'ms');
+      }
+    } catch (err) {
+      setStatus($chatTestStatus, 'fail', 'Unreachable');
+    } finally {
+      $chatTestBtn.disabled = false;
+    }
+  }
+
+  async function testFeed() {
+    const url = ($feedUrl.value || '').trim();
+    if (!url) {
+      setStatus($feedTestStatus, 'fail', 'URL empty');
+      return;
+    }
+    setStatus($feedTestStatus, 'testing', 'Testing…');
+    $feedTestBtn.disabled = true;
+    try {
+      const t0 = performance.now();
+      const res = await fetch(url, { method: 'GET' });
+      const dt = Math.round(performance.now() - t0);
+      const text = await res.text();
+      if (!res.ok) {
+        setStatus($feedTestStatus, 'fail', 'HTTP ' + res.status);
+        return;
+      }
+      if (!text) {
+        setStatus($feedTestStatus, 'fail', 'Empty body');
+        return;
+      }
+      let body = null;
+      try { body = JSON.parse(text); } catch (e) {
+        setStatus($feedTestStatus, 'fail', 'Not JSON');
+        return;
+      }
+      if (body && Array.isArray(body.items)) {
+        setStatus($feedTestStatus, 'ok', body.items.length + ' items · ' + dt + 'ms');
+      } else {
+        setStatus($feedTestStatus, 'fail', 'Bad payload');
+      }
+    } catch (err) {
+      setStatus($feedTestStatus, 'fail', 'Unreachable');
+    } finally {
+      $feedTestBtn.disabled = false;
+    }
+  }
+
+  $chatTestBtn.addEventListener('click', testChat);
+  $feedTestBtn.addEventListener('click', testFeed);
+
+  /* ── Sources reference grid ─────────────────────────── */
+  const $sourcesList = document.getElementById('sources-list');
+  SOURCES.forEach(s => {
+    const card = document.createElement('a');
+    card.className = 'feed-item';
+    card.href = s.url;
+    card.target = '_blank';
+    card.rel = 'noopener';
+    card.innerHTML = `
+      <div class="feed-item-head">
+        <span class="source-pill" style="background:${s.color}">
+          <span class="swatch"></span>${escapeHtml(s.short)}
+        </span>
+        ${s.kind === 'fb' ? '<span class="feed-item-tag">Login required</span>' : ''}
+      </div>
+      <div class="feed-item-title">${escapeHtml(s.label)}</div>
+      <div class="feed-item-excerpt">${escapeHtml(s.note)}</div>
+      <div style="font-size: 11px; color: var(--brand-sky); font-family: var(--font-mono); margin-top: 4px;">${escapeHtml(stripProto(s.url))}</div>
+    `;
+    $sourcesList.appendChild(card);
+  });
+
+  /* ── Chat ───────────────────────────────────────────── */
+  const $messages = document.getElementById('chat-messages');
+  const $empty = document.getElementById('chat-empty');
+  const $input = document.getElementById('chat-input');
+  const $send = document.getElementById('chat-send');
+  const $status = document.getElementById('chat-status');
+  const $clear = document.getElementById('chat-clear');
+
+  let history = [];
+
+  document.querySelectorAll('.example-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      $input.value = chip.textContent;
+      $input.focus();
+      autosize();
+    });
+  });
+
+  function autosize() {
+    $input.style.height = 'auto';
+    $input.style.height = Math.min($input.scrollHeight, 160) + 'px';
+  }
+  $input.addEventListener('input', autosize);
+  $input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  $send.addEventListener('click', send);
+  $clear.addEventListener('click', () => {
+    history = [];
+    $messages.innerHTML = '';
+    $messages.appendChild($empty);
+    $status.textContent = 'Ready';
+  });
+
+  async function send() {
+    const text = $input.value.trim();
+    if (!text) return;
+    const url = localStorage.getItem(LS.chat);
+    if (!url) { flashError('Chat webhook URL is not set. Open Settings above.'); $settings.open = true; return; }
+
+    if ($empty.parentNode) $empty.remove();
+
+    appendMessage('user', text);
+    history.push({ role: 'user', content: text });
+    $input.value = '';
+    autosize();
+    $send.disabled = true;
+    $status.textContent = 'Thinking…';
+
+    // Skeleton the source sections while the chat is in flight.
+    renderSectionSkeletons();
+
+    const typingEl = appendTyping();
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: history.slice(0, -1),
+          sources: SOURCES.filter(s => s.kind !== 'fb').map(s => ({ id: s.id, label: s.label, kind: s.kind, url: s.url }))
+        })
+      });
+      const data = await parseWebhookResponse(res);
+      typingEl.remove();
+
+      // The workflow itself can return { error, detail, hint } when a node fails — show it.
+      if (data && data.error) {
+        appendError(formatWorkflowError(data));
+        $status.textContent = 'Error';
+        renderIdleSections();
+        return;
+      }
+
+      const answer = (data.answer || data.message || data.text || '').toString();
+      const citations = Array.isArray(data.citations) ? data.citations : [];
+      if (!answer) {
+        appendError('Workflow returned no answer. Raw response: ' + JSON.stringify(data).slice(0, 240));
+        $status.textContent = 'Error';
+        renderIdleSections();
+        return;
+      }
+      appendAssistant(answer, citations);
+      history.push({ role: 'assistant', content: answer });
+      $status.textContent = 'Ready';
+
+      // Populate the 4 source sections from the chat response.
+      const grouped = (data && data.grouped_by_kind) || groupCitationsByKind(citations);
+      renderSectionsFromGroups(grouped, text);
+    } catch (err) {
+      typingEl.remove();
+      appendError('Chat call failed: ' + (err && err.message ? err.message : err));
+      $status.textContent = 'Error';
+      renderIdleSections();
+    } finally {
+      $send.disabled = false;
+    }
+  }
+
+  /* Fallback grouper if the workflow response doesn't include grouped_by_kind
+   * (older workflow version). Mirrors the workflow's kindOf logic. */
+  function groupCitationsByKind(citations) {
+    const out = { reddit: [], youtube: [], blogs: [], nifty: [], drive: [] };
+    (citations || []).forEach(c => {
+      const src = (c.source || '').toLowerCase();
+      const u   = (c.url    || '').toLowerCase();
+      let k = 'blogs';
+      if (src === 'drive') k = 'drive';
+      else if (src === 'nifty') k = 'nifty';
+      else if (u.indexOf('reddit.com') !== -1) k = 'reddit';
+      else if (u.indexOf('youtube.com') !== -1 || u.indexOf('youtu.be') !== -1) k = 'youtube';
+      if (out[k]) out[k].push(c);
+    });
+    return out;
+  }
+
+  /* ── Webhook response parser ────────────────────────── */
+  /* Reads body as text first so we can show what came back when JSON parsing
+   * fails or the body is empty (n8n returns 200 + empty body when a node
+   * mid-workflow errors and the execution never reaches Respond to Webhook).
+   */
+  async function parseWebhookResponse(res) {
+    let text = '';
+    try { text = await res.text(); } catch (e) {}
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status + (text ? ' — ' + text.slice(0, 240) : ' (empty body)'));
+    }
+    if (!text) {
+      throw new Error('Empty response body. The n8n workflow likely errored before reaching "Respond to Webhook" — check the Executions log for the failing node.');
+    }
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      throw new Error('Response is not JSON (' + (text.length) + ' chars): ' + text.slice(0, 240));
+    }
+  }
+
+  function formatWorkflowError(data) {
+    const parts = ['Workflow error: ' + data.error];
+    if (data.detail) parts.push(String(data.detail).slice(0, 360));
+    if (data.hint)   parts.push('Hint: ' + data.hint);
+    return parts.join(' · ');
+  }
+
+  function appendMessage(role, text) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    div.innerHTML = `<span class="avatar">${role === 'user' ? 'YOU' : 'AI'}</span><div class="bubble">${renderUserText(text)}</div>`;
+    $messages.appendChild(div);
+    $messages.scrollTop = $messages.scrollHeight;
+    return div;
+  }
+  function appendAssistant(text, citations) {
+    const div = document.createElement('div');
+    div.className = 'msg assistant';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = renderMarkdown(text, citations);
+
+    if (citations.length) {
+      const strip = document.createElement('div');
+      strip.className = 'citations';
+      citations.forEach((c, idx) => {
+        const n = c.n != null ? c.n : (idx + 1);
+        const src = findSourceLabel(c);
+        const a = document.createElement('a');
+        a.className = 'citation';
+        a.href = c.url || '#';
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.innerHTML = `<span class="num">${n}</span><span class="src">${escapeHtml(src)}</span><span class="ttl">${escapeHtml(c.title || stripProto(c.url || ''))}</span>`;
+        strip.appendChild(a);
+      });
+      bubble.appendChild(strip);
+    }
+    div.innerHTML = `<span class="avatar">AI</span>`;
+    div.appendChild(bubble);
+    $messages.appendChild(div);
+    $messages.scrollTop = $messages.scrollHeight;
+  }
+  function appendTyping() {
+    const div = document.createElement('div');
+    div.className = 'msg assistant';
+    div.innerHTML = `<span class="avatar">AI</span><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+    $messages.appendChild(div);
+    $messages.scrollTop = $messages.scrollHeight;
+    return div;
+  }
+  function appendError(msg) {
+    const div = document.createElement('div');
+    div.className = 'error';
+    div.style.margin = '0 24px 14px';
+    div.textContent = msg;
+    $messages.appendChild(div);
+    $messages.scrollTop = $messages.scrollHeight;
+  }
+  function flashError(msg) {
+    const div = document.createElement('div');
+    div.className = 'error';
+    div.style.margin = '12px 24px';
+    div.textContent = msg;
+    if ($empty.parentNode) $empty.remove();
+    $messages.appendChild(div);
+    setTimeout(() => div.remove(), 4500);
+  }
+
+  function renderUserText(text) {
+    return `<p>${escapeHtml(text).replace(/\n/g, '<br>')}</p>`;
+  }
+  function renderMarkdown(text, citations) {
+    let out = escapeHtml(text);
+    out = out.replace(/`([^`]+)`/g, '<code>$1</code>');
+    out = out.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    out = out.replace(/(^|[^\*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+    out = out.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    out = out.replace(/\[(\d+)\]/g, (m, n) => {
+      const cite = (citations || []).find(c => String(c.n) === String(n)) || (citations || [])[Number(n) - 1];
+      const href = cite && cite.url ? cite.url : '#';
+      return `<a class="citemark" href="${escapeAttr(href)}" target="_blank" rel="noopener" title="${escapeAttr((cite && (cite.title || cite.url)) || '')}">${n}</a>`;
+    });
+    return out.split(/\n{2,}/).map(p => '<p>' + p.replace(/\n/g, '<br>') + '</p>').join('');
+  }
+  function findSourceLabel(c) {
+    if (c.source) {
+      const found = SOURCES.find(s => s.id === c.source || s.label === c.source);
+      if (found) return found.short;
+      return c.source;
+    }
+    if (c.url) {
+      const found = SOURCES.find(s => c.url.includes(stripProto(s.url).split('/')[0]));
+      if (found) return found.short;
+      try { return new URL(c.url).hostname.replace(/^www\./, ''); } catch (e) {}
+    }
+    return 'Source';
+  }
+
+  /* ── Source-section rendering ───────────────────────── */
+  /* These 4 sections are populated from each chat response's
+   * grouped_by_kind field. They start in an "ask a question" empty state. */
+  const $feedMeta = document.getElementById('feed-meta');
+  const SECTION_GROUPS = [
+    { kind: 'reddit',  listEl: document.getElementById('feed-list-reddit'),  countEl: document.getElementById('feed-count-reddit'),
+      idleMsg:  'Ask a question above — top matching Reddit threads will appear here.',
+      emptyMsg: 'No Reddit threads matched.' },
+    { kind: 'youtube', listEl: document.getElementById('feed-list-youtube'), countEl: document.getElementById('feed-count-youtube'),
+      idleMsg:  'Ask a question above — top matching YouTube videos will appear here.',
+      emptyMsg: 'No YouTube videos matched.' },
+    { kind: 'nifty',   listEl: document.getElementById('feed-list-nifty'),   countEl: document.getElementById('feed-count-nifty'),
+      idleMsg:  'Ask a question above — your Nifty tasks and discussions that mention it will appear here.',
+      emptyMsg: 'Nothing in Nifty matched.' },
+    { kind: 'drive',   listEl: document.getElementById('feed-list-drive'),   countEl: document.getElementById('feed-count-drive'),
+      idleMsg:  'Ask a question above — your Drive docs that mention it will appear here.',
+      emptyMsg: 'No Drive files matched.' }
+  ];
+
+  function showGroupNotice(group, msg, cls) {
+    group.listEl.innerHTML = '';
+    const el = document.createElement('div');
+    el.className = cls || 'feed-group-empty';
+    el.textContent = msg;
+    group.listEl.appendChild(el);
+  }
+  function renderSectionSkeletons() {
+    SECTION_GROUPS.forEach(g => {
+      g.listEl.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const s = document.createElement('div');
+        s.className = 'skeleton-item';
+        s.innerHTML = `<div class="skeleton skeleton-line w-30"></div><div class="skeleton skeleton-line w-80"></div><div class="skeleton skeleton-line w-60"></div>`;
+        g.listEl.appendChild(s);
+      }
+      g.countEl.textContent = '';
+    });
+  }
+  function renderIdleSections() {
+    SECTION_GROUPS.forEach(g => {
+      g.countEl.textContent = '';
+      showGroupNotice(g, g.idleMsg);
+    });
+  }
+  function renderSectionsFromGroups(grouped, query) {
+    if ($feedMeta) {
+      $feedMeta.textContent = query
+        ? 'Showing results for: "' + query + '"  ·  ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '';
+    }
+    SECTION_GROUPS.forEach(g => {
+      const items = (grouped && Array.isArray(grouped[g.kind])) ? grouped[g.kind] : [];
+      g.listEl.innerHTML = '';
+      g.countEl.textContent = items.length ? items.length + (items.length === 1 ? ' hit' : ' hits') : '';
+      if (!items.length) {
+        showGroupNotice(g, g.emptyMsg);
+        return;
+      }
+      items.forEach(item => g.listEl.appendChild(renderSectionItem(item, g.kind)));
+    });
+  }
+  function renderSectionItem(item, kind) {
+    const a = document.createElement('a');
+    a.className = 'feed-item';
+    a.href = item.url || '#';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    const pillLabel = item.source_label || item.source || kind;
+    const pillColor = kind === 'reddit'  ? '#ff4500'
+                    : kind === 'youtube' ? '#cc0000'
+                    : kind === 'nifty'   ? '#7c3aed'
+                    : kind === 'drive'   ? '#0f9d58'
+                    : '#475467';
+    a.innerHTML = `
+      <div class="feed-item-head">
+        <span class="source-pill" style="background:${pillColor}"><span class="swatch"></span>${escapeHtml(pillLabel)}</span>
+      </div>
+      <div class="feed-item-title">${escapeHtml(item.title || '(untitled)')}</div>
+      ${item.snippet ? `<div class="feed-item-excerpt">${escapeHtml(item.snippet)}</div>` : ''}
+    `;
+    return a;
+  }
+
+  /* ── Helpers ────────────────────────────────────────── */
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function escapeAttr(s) { return escapeHtml(s); }
+  function stripProto(u) { return String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, ''); }
+
+  renderIdleSections();
+})();
+</script>
+</body>
+</html>

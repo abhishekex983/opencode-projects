@@ -1,0 +1,848 @@
+﻿{
+    "name":  "Blog Post Creation -- Outline + Content",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "content":  "## Blog Post Creator\n\n**Two webhooks, one workflow:**\n\n1. `POST /blog-post-outline` - accepts topic, voice, anecdotes, opinions, stats toggle, keywords (focus/header/entities/common/extra), plus optional context blocks (intent from search-intent, salience from salience-brief, audience from question-research). If stats is enabled, scrapes Exa + summarises via Gemini Flash, then generates a markdown outline.\n\n2. `POST /blog-post-content` - accepts the edited outline + the same keyword inputs, expands it into final blog copy.\n\n**Error handling:**\n- A Workflow Error Trigger catches ANY unhandled node error and returns JSON `{error: ...}` instead of n8n\u0027s default HTML error page.\n- This prevents the \"Webhook did not return JSON (HTTP 200)\" frontend error.\n\n**Before running:**\n1. API keys for OpenRouter and Exa are pre-filled in the Code nodes.\n2. Activate the workflow and copy the two Production webhook URLs into the frontend\u0027s Blog Post Creation tab.\n3. Both webhook nodes have `allowedOrigins: \"*\"` for CORS.\n\n**Model choices (all swappable):**\n- Stats summarisation: `google/gemini-2.5-flash` (cheap, fast)\n- Outline + content: `anthropic/claude-sonnet-4.5` (strongest for long-form SEO + structure)",
+                                         "height":  460,
+                                         "width":  460
+                                     },
+                      "id":  "sticky-readme",
+                      "name":  "README",
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -1000,
+                                       -280
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "## API Keys Needed\n\nOpenRouter API key is baked into the Code nodes (Stats Scrape, Build Outline Prompt, Build Content Prompt).\n\nExa API key is baked into the Stats Scrape node.\n\nTo rotate keys, edit those nodes.",
+                                         "height":  200,
+                                         "width":  460,
+                                         "color":  5
+                                     },
+                      "id":  "sticky-keys",
+                      "name":  "API Keys",
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -1000,
+                                       240
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "httpMethod":  "POST",
+                                         "path":  "blog-post-outline",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+                                                         "allowedOrigins":  "*"
+                                                     }
+                                     },
+                      "id":  "outline-webhook",
+                      "name":  "Outline Webhook",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -500,
+                                       0
+                                   ],
+                      "webhookId":  "blog-post-outline"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "loose"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "is-test-cond-outline",
+                                                                                   "leftValue":  "={{ !!($json.body?.test || $json.test) }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "outline-is-test",
+                      "name":  "Is Outline Test?",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       -300,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={\n  \"ok\": true,\n  \"message\": \"Webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "outline-respond-test",
+                      "name":  "Respond Outline Test OK",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -100,
+                                       -200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Normalize inputs from the blog-post-outline webhook.\nconst input = $input.first().json;\nconst form = (input \u0026\u0026 typeof input.body === \u0027object\u0027 \u0026\u0026 input.body !== null \u0026\u0026 Object.keys(input.body).length \u003e 0)\n  ? input.body\n  : input;\n\nconst norm = s =\u003e String(s).toLowerCase().replace(/[^a-z0-9]/g, \u0027\u0027);\nconst pick = (...keys) =\u003e {\n  for (const k of keys) {\n    if (form[k] !== undefined \u0026\u0026 form[k] !== null \u0026\u0026 form[k] !== \u0027\u0027) return form[k];\n  }\n  const targets = keys.map(norm);\n  for (const k of Object.keys(form)) {\n    const n = norm(k);\n    if (targets.some(t =\u003e n === t || n.startsWith(t))) return form[k];\n  }\n  return \u0027\u0027;\n};\n\nconst toArr = v =\u003e {\n  if (Array.isArray(v)) return v.map(x =\u003e String(x).trim()).filter(Boolean);\n  if (typeof v === \u0027string\u0027) return v.split(/[,;\\n]/).map(s =\u003e s.trim()).filter(Boolean);\n  return [];\n};\n\nconst parseBool = v =\u003e {\n  if (typeof v === \u0027boolean\u0027) return v;\n  if (typeof v === \u0027string\u0027) return v.toLowerCase() === \u0027true\u0027 || v === \u00271\u0027;\n  if (typeof v === \u0027number\u0027) return v !== 0;\n  return false;\n};\n\nreturn [{\n  json: {\n    topic: pick(\u0027topic\u0027, \u0027Topic\u0027) || \u0027\u0027,\n    voice: pick(\u0027voice\u0027, \u0027Voice\u0027) || \u0027\u0027,\n    anecdotes: pick(\u0027anecdotes\u0027, \u0027Anecdotes\u0027) || \u0027\u0027,\n    opinions: pick(\u0027opinions\u0027, \u0027Opinions\u0027) || \u0027\u0027,\n    stats_enabled: parseBool(pick(\u0027stats_enabled\u0027, \u0027Stats Enabled\u0027, \u0027statsEnabled\u0027)),\n    focus_keyword: pick(\u0027focus_keyword\u0027, \u0027Focus Keyword\u0027, \u0027focusKeyword\u0027) || \u0027\u0027,\n    header_keywords: toArr(pick(\u0027header_keywords\u0027, \u0027Header Keywords\u0027, \u0027headerKeywords\u0027)),\n    entities: toArr(pick(\u0027entities\u0027, \u0027Entities\u0027)),\n    common_keywords: toArr(pick(\u0027common_keywords\u0027, \u0027Common Keywords\u0027, \u0027commonKeywords\u0027)),\n    extra_keywords: toArr(pick(\u0027extra_keywords\u0027, \u0027Extra Keywords\u0027, \u0027extraKeywords\u0027)),\n    target_word_count: parseInt(pick(\u0027target_word_count\u0027, \u0027Target Word Count\u0027, \u0027targetWordCount\u0027)) || 0,\n    intent_context_text: String(pick(\u0027intent_context_text\u0027, \u0027intentContextText\u0027) || \u0027\u0027).trim(),\n    salience_context_text: String(pick(\u0027salience_context_text\u0027, \u0027salienceContextText\u0027) || \u0027\u0027).trim(),\n    audience_context_text: String(pick(\u0027audience_context_text\u0027, \u0027audienceContextText\u0027) || \u0027\u0027).trim(),\n    internal_links: Array.isArray(form.internal_links) ? form.internal_links.filter(u =\u003e typeof u === \u0027string\u0027 \u0026\u0026 /^https?:\\/\\//.test(u)) : []\n  }\n}];"
+                                     },
+                      "id":  "outline-normalize",
+                      "name":  "Normalize Outline Inputs",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -100,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// If stats_enabled, search Exa for statistics/data related to the topic\n// and summarise with Gemini Flash.\n//\n// REPLACE these constants with your real keys:\n//   OPENROUTER_API_KEY\n//   EXA_API_KEY\n\nconst OPENROUTER_API_KEY = \u0027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\u0027;\nconst EXA_API_KEY = \u0027b0beb520-610f-4246-ade5-7620631a89aa\u0027;\nconst STATS_MODEL = \u0027google/gemini-2.5-flash\u0027;\n\nconst form = $(\u0027Normalize Outline Inputs\u0027).first().json;\n\nif (!form.stats_enabled) {\n  return [{\n    json: {\n      stats_enabled: false,\n      stats_block: \u0027\u0027,\n      source_count: 0\n    }\n  }];\n}\n\nconst query = (form.topic || form.focus_keyword || \u0027\u0027).trim();\nif (!query) {\n  return [{ json: { stats_enabled: true, stats_block: \u0027\u0027, source_count: 0, error: \u0027No topic or focus keyword\u0027 } }];\n}\n\nlet statsBlock = \u0027\u0027;\nlet sourceCount = 0;\nlet errorMsg = null;\n\ntry {\n  // 1. Exa search\n  const exaResp = await this.helpers.httpRequest({\n    method: \u0027POST\u0027,\n    url: \u0027https://api.exa.ai/search\u0027,\n    headers: {\n      \u0027x-api-key\u0027: EXA_API_KEY,\n      \u0027Content-Type\u0027: \u0027application/json\u0027\n    },\n    body: {\n      query: query + \u0027 statistics data study research\u0027,\n      numResults: 8,\n      type: \u0027neural\u0027,\n      useAutoprompt: true\n    },\n    json: true,\n    timeout: 30000\n  });\n\n  if (!exaResp || !Array.isArray(exaResp.results) || exaResp.results.length === 0) {\n    errorMsg = \u0027No statistical sources found\u0027;\n  } else {\n    // 2. Fetch contents\n    const ids = exaResp.results.slice(0, 8).map(r =\u003e r.id).filter(Boolean);\n    const contentsResp = await this.helpers.httpRequest({\n      method: \u0027POST\u0027,\n      url: \u0027https://api.exa.ai/contents\u0027,\n      headers: {\n        \u0027x-api-key\u0027: EXA_API_KEY,\n        \u0027Content-Type\u0027: \u0027application/json\u0027\n      },\n      body: {\n        ids,\n        text: { maxCharacters: 4000, includeHtmlTags: false }\n      },\n      json: true,\n      timeout: 30000\n    });\n\n    const textById = new Map();\n    if (contentsResp \u0026\u0026 Array.isArray(contentsResp.results)) {\n      for (const c of contentsResp.results) {\n        if (c.id \u0026\u0026 c.text) textById.set(c.id, c.text);\n      }\n    }\n\n    // Collect meaningful texts\n    const texts = [];\n    for (const r of exaResp.results) {\n      const body = (textById.get(r.id) || \u0027\u0027).trim();\n      if (body.length \u003e 100) {\n        texts.push(\u0027[Source: \u0027 + (r.title || r.url || \u0027unknown\u0027) + \u0027]\\n\u0027 + body);\n        sourceCount++;\n      }\n      if (sourceCount \u003e= 5) break;\n    }\n\n    if (texts.length === 0) {\n      errorMsg = \u0027Exa results had insufficient text content\u0027;\n    } else {\n      // 3. Summarise with Gemini Flash\n      const combined = texts.join(\u0027\\n\\n---\\n\\n\u0027);\n      const llmResp = await this.helpers.httpRequest({\n        method: \u0027POST\u0027,\n        url: \u0027https://openrouter.ai/api/v1/chat/completions\u0027,\n        headers: {\n          \u0027Authorization\u0027: \u0027Bearer \u0027 + OPENROUTER_API_KEY,\n          \u0027Content-Type\u0027: \u0027application/json\u0027,\n          \u0027HTTP-Referer\u0027: \u0027https://shettymarketing.com\u0027,\n          \u0027X-Title\u0027: \u0027Blog Post Creator (n8n)\u0027\n        },\n        body: {\n          model: STATS_MODEL,\n          messages: [\n            { role: \u0027system\u0027, content: \u0027You are a research assistant. Extract relevant statistics, data points, percentages, study findings, and research results from the provided sources. Output a concise bullet-point list. Include the specific numbers and cite the source name in brackets. Format: \"- [statistic] [source name]\". If a source has no concrete data, skip it. Output only the bullet list, no preamble.\u0027 },\n            { role: \u0027user\u0027, content: \u0027Extract all statistics, data points, and research findings from the following sources about \"\u0027 + query + \u0027\". Return only the bullet-point list:\\n\\n\u0027 + combined }\n          ],\n          temperature: 0\n        },\n        json: true,\n        timeout: 60000\n      });\n\n      statsBlock = llmResp?.choices?.[0]?.message?.content || \u0027\u0027;\n    }\n  }\n} catch (err) {\n  errorMsg = \u0027Stats scraping failed: \u0027 + (err.message || String(err));\n}\n\nreturn [{\n  json: {\n    stats_enabled: true,\n    stats_block: statsBlock,\n    source_count: sourceCount,\n    error: errorMsg\n  }\n}];"
+                                     },
+                      "id":  "outline-stats",
+                      "name":  "Stats Scrape",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       120,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Build the OpenRouter request body for blog-post outline generation.\n//\n// REPLACE the OPENROUTER_API_KEY constant and tune OUTLINE_MODEL below.\n\nconst OPENROUTER_API_KEY = \u0027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\u0027;\nconst OUTLINE_MODEL      = \u0027google/gemini-2.5-flash\u0027;\n\nconst form = $(\u0027Fetch Writing Style (Outline)\u0027).first().json;\nconst stats = $(\u0027Stats Scrape\u0027).first().json;\n\n// Word count breakdown calculation\nconst targetWC = form.target_word_count || 0;\nlet wcBreakdown = \u0027\u0027;\n\nif (targetWC \u003e 0) {\n  const introWords = Math.round(targetWC * 0.10);\n  const conclusionWords = Math.round(targetWC * 0.10);\n  const bodyWords = targetWC - introWords - conclusionWords;\n  const estimatedH2 = 5;\n  const wordsPerH2 = Math.round(bodyWords / estimatedH2);\n  \n  wcBreakdown = \u0027\\n\\nWORD COUNT TARGET: \u0027 + targetWC + \u0027 words (\\u00b15% tolerance: \u0027 + Math.round(targetWC * 0.95) + \u0027-\u0027 + Math.round(targetWC * 1.05) + \u0027 words)\\n- Intro paragraph: ~\u0027 + introWords + \u0027 words (above-the-fold, before first H2)\\n- Each H2 section: ~\u0027 + wordsPerH2 + \u0027 words (\u0027 + estimatedH2 + \u0027 sections)\\n- Conclusion: ~\u0027 + conclusionWords + \u0027 words\\n\\nThe outline MUST have enough H2/H3 depth to support this word count. Each section description should include its target word count.\u0027;\n}\n\nconst systemPrompt = \u0027You are a senior blog editor and SEO strategist. You write blog-post outlines that rank in Google AND are quoted by LLM-based search (ChatGPT, Gemini, Perplexity).\\n\\n\u0027 +\n\u0027GROUNDING RULES (ordered by priority):\\n\u0027 +\n\u00271. SEARCH INTENT INSIGHTS (HIGHEST PRIORITY): If \u003cintent_context\u003e contains content, treat it as authoritative truth about what users searching this topic actually want. Shape the outline to address the stated primary intent. Use sub-intents to inspire section topics. If a recommended page archetype is specified (listicle, guide, how-to, comparison, etc.), you MUST follow it exactly. Do NOT default to a generic guide structure if the intent calls for a listicle. If a modifier-SERP conflict is flagged, follow that guidance.\\n\u0027 +\n\u00272. SALIENCE INSIGHTS (SECOND HIGHEST PRIORITY): If \u003csalience_context\u003e contains content (must-cover entities, H2 candidates, supporting topics), weave must-cover entities using exact entity names. Use H2/H3 candidates from salience as structural anchors. Give must-cover entities their own H2/H3 if they are significant enough.\\n\u0027 +\n\u00273. Design the blog structure yourself. Choose the best H1 title, section headings, and flow based on the topic, voice, anecdotes, opinions, stats, and keyword context provided. Do NOT follow a fixed template -- let the content dictate the structure.\\n\u0027 +\n\u00274. The H1 must include the Focus Keyword naturally. It should read like a compelling blog title, not a keyword-stuffed headline.\\n\u0027 +\n\u00275. Every section body must be one or two short lines describing what the writer should cover in that section, citing which keywords / entities / anecdotes / stats to weave in. Do NOT write the actual paragraph content here -- outlines only.\\n\u0027 +\n\u00276. Weave keywords naturally: Focus Keyword in the H1 and intro, Header Keywords in H2/H3 headings, Entities where they add authority, Common/Extra Keywords throughout body descriptions.\\n\u0027 +\n\u00277. If \u003cvoice_context\u003e is provided, write all section descriptions in that exact voice -- mirror the tone, style, perspective, and audience level described.\\n\u0027 +\n\u00278. If \u003canecdotes\u003e are provided, place each anecdote in the most relevant section -- tag it as [Include anecdote: \u003csummary\u003e] in the section body.\\n\u0027 +\n\u00279. If \u003copinions\u003e are provided, ensure at least 1-2 sections explicitly call out the unique/contrarian takes. Tag them as [POV: \u003csummary\u003e].\\n\u0027 +\n\u002710. If \u003cstats_context\u003e is provided (statistics and data points from live research), weave the most relevant stats into appropriate sections. Tag them as [Include stat: \u003csummary\u003e]. Do not fabricate new stats.\\n\u0027 +\n\u002711. AUDIENCE RESEARCH: If \u003caudience_context\u003e contains content (problem clusters with questions and content angles), use the user problems as primary inspiration for section topics. Address the top emotional/practical concerns early, not buried deep.\u0027 +\n\u002714. INTERNAL LINKING: If \u003cinternal_links\u003e is provided, identify 3-5 places where internal links are contextually relevant. Insert them as markdown links: [descriptive anchor text](URL). Anchor text must be natural and match the linked page topic. Only use a link when the surrounding content genuinely relates to that URL. Never force irrelevant links.\u0027 +\nwcBreakdown + \u0027\\n\\n\u0027 +\n\u0027TONE: Match the provided voice exactly. If no voice is provided, default to conversational, authoritative, and benefit-driven.\\n\\n\u0027 +\n\u0027OUTPUT: Plain markdown. No preamble. No trailing commentary. No code fences.\u0027;\n\nconst parts = [];\n// PRIORITY ORDER: intent \u003e salience \u003e keywords \u003e anecdotes/opinions \u003e rest\nparts.push(\u0027\u003cintent_context\u003e\\n\u0027 + (form.intent_context_text || \u0027(not provided)\u0027) + \u0027\\n\u003c/intent_context\u003e\u0027);\nparts.push(\u0027\u003csalience_context\u003e\\n\u0027 + (form.salience_context_text || \u0027(not provided)\u0027) + \u0027\\n\u003c/salience_context\u003e\u0027);\nparts.push(\u0027\u003cmarketer_inputs\u003e\\nFocus Keyword: \u0027 + (form.focus_keyword || \u0027(not set)\u0027) + \u0027\\nHeader Keywords: \u0027 + ((form.header_keywords || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + \u0027\\nEntities: \u0027 + ((form.entities || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + \u0027\\nCommon Keywords: \u0027 + ((form.common_keywords || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + \u0027\\nExtra Keywords: \u0027 + ((form.extra_keywords || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + (targetWC \u003e 0 ? \u0027\\nTarget Word Count: \u0027 + targetWC + \u0027 words\u0027 : \u0027\u0027) + \u0027\\n\u003c/marketer_inputs\u003e\u0027);\nif (form.anecdotes) parts.push(\u0027\u003canecdotes\u003e\\n\u0027 + form.anecdotes + \u0027\\n\u003c/anecdotes\u003e\u0027);\nif (form.opinions) parts.push(\u0027\u003copinions\u003e\\n\u0027 + form.opinions + \u0027\\n\u003c/opinions\u003e\u0027);\nparts.push(\u0027\u003ctopic\u003e\\n\u0027 + (form.topic || form.focus_keyword || \u0027(not set)\u0027) + \u0027\\n\u003c/topic\u003e\u0027);\nif (form.voice) parts.push(\u0027\u003cvoice_context\u003e\\n\u0027 + form.voice + \u0027\\n\u003c/voice_context\u003e\u0027);\nif (stats.stats_block) parts.push(\u0027\u003cstats_context\u003e\\n\u0027 + stats.stats_block + \u0027\\n\u003c/stats_context\u003e\u0027);\nparts.push(\u0027\u003caudience_context\u003e\\n\u0027 + (form.audience_context_text || \u0027(not provided)\u0027) + \u0027\\n\u003c/audience_context\u003e\u0027);\nif (form.internal_links \u0026\u0026 form.internal_links.length \u003e 0) {\n  parts.push(\u0027\u003cinternal_links\u003e\\nAvailable internal URLs for contextual linking. Only use when the surrounding content genuinely matches the URL topic. Use the URL path to judge relevance.\\n\u0027 + form.internal_links.map(u =\u003e \u0027- \u0027 + u).join(\u0027\\n\u0027) + \u0027\\n\u003c/internal_links\u003e\u0027);\n}\nif (form.internal_links \u0026\u0026 form.internal_links.length \u003e 0) {\n  parts.push(\u0027\u003cinternal_links\u003e\\nAvailable internal URLs for contextual linking. Only use when the surrounding content genuinely matches the URL topic. Use the URL path to judge relevance.\\n\u0027 + form.internal_links.map(u =\u003e \u0027- \u0027 + u).join(\u0027\\n\u0027) + \u0027\\n\u003c/internal_links\u003e\u0027);\n}\nparts.push(\u0027Now produce the blog-post outline.\u0027);\nconst userPrompt = parts.join(\u0027\\n\\n\u0027);\n\nreturn [{\n  json: {\n    form,\n    stats,\n    outline_model: OUTLINE_MODEL,\n    openrouter_api_key: OPENROUTER_API_KEY,\n    openrouter_request: {\n      model: OUTLINE_MODEL,\n      messages: [\n        { role: \u0027system\u0027, content: systemPrompt },\n        { role: \u0027user\u0027, content: userPrompt }\n      ],\n      temperature: 0.3,\n      max_tokens: 8192\n    }\n  }\n}];\n"
+                                     },
+                      "id":  "outline-build-prompt",
+                      "name":  "Build Outline Prompt",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       340,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://openrouter.ai/api/v1/chat/completions",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{ $json.openrouter_api_key }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "HTTP-Referer",
+                                                                                         "value":  "https://shettymarketing.com"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Title",
+                                                                                         "value":  "Blog Post Creator (n8n)"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ JSON.stringify($json.openrouter_request) }}",
+                                         "options":  {
+                                                         "timeout":  120000
+                                                     }
+                                     },
+                      "id":  "outline-openrouter",
+                      "name":  "OpenRouter (Outline)",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       560,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Extract the markdown outline from the OpenRouter response.\nconst resp = $input.first().json;\nconst payload = $(\u0027Build Outline Prompt\u0027).first().json;\n\nif (resp.error) {\n  return [{ json: { error: \u0027OpenRouter returned error\u0027, detail: resp.error } }];\n}\n\nconst outline = resp?.choices?.[0]?.message?.content;\nif (!outline) {\n  return [{ json: { error: \u0027No outline in OpenRouter response\u0027, raw: resp } }];\n}\n\nconst cleaned = outline.replace(/^```(?:markdown|md)?\\s*/i, \u0027\u0027).replace(/\\s*```\\s*$/i, \u0027\u0027).trim();\n\nconst result = {\n  request: {\n    topic: payload.form?.topic,\n    focus_keyword: payload.form?.focus_keyword,\n    header_keywords: payload.form?.header_keywords,\n    entities: payload.form?.entities,\n    common_keywords: payload.form?.common_keywords,\n    extra_keywords: payload.form?.extra_keywords,\n    target_word_count: payload.form?.target_word_count\n  },\n  outline: cleaned,\n  model: payload.outline_model,\n  usage: resp.usage || null,\n  generated_at: new Date().toISOString()\n};\n\nif (payload.stats \u0026\u0026 payload.stats.stats_enabled) {\n  result.stats = {\n    enabled: true,\n    source_count: payload.stats.source_count,\n    stats_block: payload.stats.stats_block,\n    error: payload.stats.error || null\n  };\n}\n\nreturn [{ json: result }];"
+                                     },
+                      "id":  "outline-parse",
+                      "name":  "Parse Outline",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       780,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={{ JSON.stringify($json) }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "outline-respond",
+                      "name":  "Respond with Outline",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       1000,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "httpMethod":  "POST",
+                                         "path":  "blog-post-content",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+                                                         "allowedOrigins":  "*"
+                                                     }
+                                     },
+                      "id":  "content-webhook",
+                      "name":  "Content Webhook",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -500,
+                                       600
+                                   ],
+                      "webhookId":  "blog-post-content"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "loose"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "is-test-cond-content",
+                                                                                   "leftValue":  "={{ !!($json.body?.test || $json.test) }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "content-is-test",
+                      "name":  "Is Content Test?",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       -300,
+                                       600
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={\n  \"ok\": true,\n  \"message\": \"Webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "content-respond-test",
+                      "name":  "Respond Content Test OK",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -100,
+                                       400
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Normalize inputs for the blog-post-content webhook.\nconst input = $input.first().json;\nconst form = (input \u0026\u0026 typeof input.body === \u0027object\u0027 \u0026\u0026 input.body !== null \u0026\u0026 Object.keys(input.body).length \u003e 0)\n  ? input.body\n  : input;\n\nconst norm = s =\u003e String(s).toLowerCase().replace(/[^a-z0-9]/g, \u0027\u0027);\nconst pick = (...keys) =\u003e {\n  for (const k of keys) {\n    if (form[k] !== undefined \u0026\u0026 form[k] !== null \u0026\u0026 form[k] !== \u0027\u0027) return form[k];\n  }\n  const targets = keys.map(norm);\n  for (const k of Object.keys(form)) {\n    const n = norm(k);\n    if (targets.some(t =\u003e n === t || n.startsWith(t))) return form[k];\n  }\n  return \u0027\u0027;\n};\n\nconst toArr = v =\u003e {\n  if (Array.isArray(v)) return v.map(x =\u003e String(x).trim()).filter(Boolean);\n  if (typeof v === \u0027string\u0027) return v.split(/[,;\\n]/).map(s =\u003e s.trim()).filter(Boolean);\n  return [];\n};\n\nreturn [{\n  json: {\n    edited_outline: pick(\u0027edited_outline\u0027, \u0027outline\u0027, \u0027editedOutline\u0027) || \u0027\u0027,\n    focus_keyword: pick(\u0027focus_keyword\u0027, \u0027Focus Keyword\u0027, \u0027focusKeyword\u0027) || \u0027\u0027,\n    header_keywords: toArr(pick(\u0027header_keywords\u0027, \u0027Header Keywords\u0027, \u0027headerKeywords\u0027)),\n    entities: toArr(pick(\u0027entities\u0027, \u0027Entities\u0027)),\n    common_keywords: toArr(pick(\u0027common_keywords\u0027, \u0027Common Keywords\u0027, \u0027commonKeywords\u0027)),\n    extra_keywords: toArr(pick(\u0027extra_keywords\u0027, \u0027Extra Keywords\u0027, \u0027extraKeywords\u0027)),\n    target_word_count: parseInt(pick(\u0027target_word_count\u0027, \u0027Target Word Count\u0027, \u0027targetWordCount\u0027)) || 0,\n    intent_context_text: String(pick(\u0027intent_context_text\u0027, \u0027intentContextText\u0027) || \u0027\u0027).trim(),\n    salience_context_text: String(pick(\u0027salience_context_text\u0027, \u0027salienceContextText\u0027) || \u0027\u0027).trim(),\n    audience_context_text: String(pick(\u0027audience_context_text\u0027, \u0027audienceContextText\u0027) || \u0027\u0027).trim(),\n    internal_links: Array.isArray(form.internal_links) ? form.internal_links.filter(u =\u003e typeof u === \u0027string\u0027 \u0026\u0026 /^https?:\\/\\//.test(u)) : []\n  }\n}];"
+                                     },
+                      "id":  "content-normalize",
+                      "name":  "Normalize Content Inputs",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -100,
+                                       600
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Build the OpenRouter request body for final blog content generation from the edited outline.\n//\n// REPLACE the OPENROUTER_API_KEY constant and tune CONTENT_MODEL below.\n\nconst OPENROUTER_API_KEY = \u0027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\u0027;\nconst CONTENT_MODEL      = \u0027google/gemini-2.5-pro\u0027;\n\nconst form = $(\u0027Fetch Writing Style (Content)\u0027).first().json;\n\nif (!form.edited_outline) {\n  return [{ json: { error: \u0027edited_outline is required\u0027 } }];\n}\n\n// Word count enforcement calculation\nconst targetWC = form.target_word_count || 0;\nlet wcEnforcement = \u0027\u0027;\n\nif (targetWC \u003e 0) {\n  const h2Matches = (form.edited_outline || \u0027\u0027).match(/^##\\s+/gm) || [];\n  const h2Count = Math.max(h2Matches.length, 1);\n  const introWords = Math.round(targetWC * 0.10);\n  const conclusionWords = Math.round(targetWC * 0.10);\n  const bodyWords = targetWC - introWords - conclusionWords;\n  const wordsPerH2 = Math.round(bodyWords / h2Count);\n  \n  wcEnforcement = \u0027\\n\\nWORD COUNT ENFORCEMENT (NON-NEGOTIABLE):\\n- TOTAL: \u0027 + targetWC + \u0027 words (\\u00b15% tolerance: \u0027 + Math.round(targetWC * 0.95) + \u0027-\u0027 + Math.round(targetWC * 1.05) + \u0027 words)\\n- Intro paragraph: \u0027 + introWords + \u0027 words exactly\\n- Each H2 section: \u0027 + wordsPerH2 + \u0027 words exactly (\u0027 + h2Count + \u0027 sections)\\n- Conclusion: \u0027 + conclusionWords + \u0027 words exactly\\n\\nRULES:\\n1. Count words as you write each section\\n2. Hit the target for EACH section, not just the total\\n3. If a section is short, expand with examples, data, or explanations\\n4. If a section is long, tighten prose without losing meaning\\n5. Do NOT add filler to hit counts - every word must add value\\n6. The final output MUST be within \\u00b15% of \u0027 + targetWC + \u0027 words\u0027;\n}\n\nconst systemPrompt = (form.writing_style_instructions ? \u0027\\n\\nCRITICAL WRITING STYLE RULES (MANDATORY \\u2014 follow EVERY rule below exactly. These OVERRIDE all other tone/style guidance):\\n\u0027 + form.writing_style_instructions + \u0027\\n\\n---\\n\\nThe CRITICAL rules above are your HIGHEST priority. Every sentence you write MUST comply with them. Now follow the additional SEO/structure rules below:\\n\\n\u0027 : \u0027\u0027) +\n\u0027You are a senior blog editor and SEO copywriter. You write blog-post content that ranks in Google AND is quoted by LLM-based search.\\n\\n\u0027 +\n\u0027GROUNDING RULES (ordered by priority):\\n\u0027 +\n\u00271. SEARCH INTENT INSIGHTS (HIGHEST PRIORITY): If \u003cintent_context\u003e contains content, calibrate tone, depth, and CTAs to the stated primary intent. Transactional -\u003e buy/subscribe CTAs. Informational -\u003e no heavy sell, focus on teaching. If a recommended page archetype is specified (listicle, guide, how-to, comparison), you MUST follow that archetype. If a modifier-SERP conflict is flagged, follow that guidance.\\n\u0027 +\n\u00272. SALIENCE INSIGHTS (SECOND HIGHEST PRIORITY): If \u003csalience_context\u003e contains content, weave must-cover entities naturally throughout the body copy using exact entity names.\\n\u0027 +\n\u00273. Expand every section of the provided outline into final blog copy. Do NOT add, remove, or reorder sections unless the outline explicitly signals flexibility.\\n\u0027 +\n\u00274. Under every heading, write engaging, authentic prose. H2s get 2-4 paragraphs. H3s get 1-2 paragraphs. The intro hook should grab attention in the first sentence -- use a stat, a provocative statement, or a vivid anecdote as appropriate.\\n\u0027 +\n\u00275. Naturally weave in the Focus Keyword, Header Keywords, Entities, and Common Keywords. Use the Focus Keyword in the H1 and once in the opening paragraph. Use Entities where they add trust signals. Do not keyword-stuff.\\n\u0027 +\n\u00276. If the outline contains [Include anecdote: ...] tags, expand the anecdote into full narrative prose in that section. Make it personal and vivid.\\n\u0027 +\n\u00277. If the outline contains [POV: ...] tags, expand the opinion into a clear, confident position statement with supporting reasoning.\\n\u0027 +\n\u00278. If the outline contains [Include stat: ...] tags, present the statistic naturally with proper attribution -- \"According to [source], ...\" or similar phrasing. Do not fabricate stats not present in the outline tags.\\n\u0027 +\n\u00279. If \u003cvoice_context\u003e was provided, the entire post must read in that voice -- every sentence, every transition, every takeaway. The voice is non-negotiable.\\n\u0027 +\n\u002710. For any [TO FILL] markers in the outline, leave a [TO FILL: \u003clabel\u003e] placeholder instead of fabricating.\\n\u0027 +\n\u002711. AUDIENCE RESEARCH: If \u003caudience_context\u003e contains content, address the top user problems explicitly. Use the phrasing patterns from representative questions to write relatable copy.\\n\u0027 +\n\u002712. PARAGRAPH LENGTH (NON-NEGOTIABLE): Every paragraph must be a MINIMUM of 3 lines and a MAXIMUM of 4 lines. This is critical for readability -- large chunks of text ruin the reading experience. If a paragraph runs longer than 4 lines, break it into two paragraphs. If a paragraph is shorter than 3 lines, expand it with supporting detail or merge it with an adjacent paragraph.\u0027 +\n\u002714. INTERNAL LINKING: If \u003cinternal_links\u003e is provided, identify 3-5 places where internal links are contextually relevant. Insert them as markdown links: [descriptive anchor text](URL). Anchor text must be natural and match the linked page topic. Only use a link when the surrounding content genuinely relates to that URL. Never force irrelevant links.\u0027 +\nwcEnforcement + \u0027\\n\\n\u0027 +\n\u0027FORMAT: Pure markdown. Preserve H1/H2/H3 structure exactly. No preamble, no trailing commentary, no code fences.\\n\\n\u0027 +\n\u0027TONE: Match the provided voice exactly. If no voice provided, default to conversational, authoritative, and benefit-driven. Short sentences. No filler phrases. No fluff.\u0027 +\n(form.writing_style_instructions ? \u0027\\n\\nWRITING STYLE INSTRUCTIONS (follow these precisely):\\n\u0027 + form.writing_style_instructions : \u0027\u0027);\n\nconst parts = [];\n// PRIORITY ORDER: intent \u003e salience \u003e keywords \u003e anecdotes/opinions \u003e audience \u003e outline\nparts.push(\u0027\u003cintent_context\u003e\\n\u0027 + (form.intent_context_text || \u0027(not provided)\u0027) + \u0027\\n\u003c/intent_context\u003e\u0027);\nparts.push(\u0027\u003csalience_context\u003e\\n\u0027 + (form.salience_context_text || \u0027(not provided)\u0027) + \u0027\\n\u003c/salience_context\u003e\u0027);\nparts.push(\u0027\u003cmarketer_inputs\u003e\\nFocus Keyword: \u0027 + (form.focus_keyword || \u0027(not set)\u0027) + \u0027\\nHeader Keywords: \u0027 + ((form.header_keywords || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + \u0027\\nEntities: \u0027 + ((form.entities || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + \u0027\\nCommon Keywords: \u0027 + ((form.common_keywords || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + \u0027\\nExtra Keywords: \u0027 + ((form.extra_keywords || []).join(\u0027, \u0027) || \u0027(not set)\u0027) + (targetWC \u003e 0 ? \u0027\\nTarget Word Count: \u0027 + targetWC + \u0027 words\u0027 : \u0027\u0027) + \u0027\\n\u003c/marketer_inputs\u003e\u0027);\n// Anecdotes \u0026 Opinions reinforcement -- remind the AI of raw material even though outline tags carry them too\nif (form.anecdotes || form.opinions) {\n  let reinforce = \u0027\u0027;\n  if (form.anecdotes) reinforce += \u0027Anecdotes to incorporate:\\n\u0027 + form.anecdotes;\n  if (form.opinions) reinforce += (reinforce ? \u0027\\n\\n\u0027 : \u0027\u0027) + \u0027Opinions to weave in:\\n\u0027 + form.opinions;\n  parts.push(\u0027\u003canecdotes_opinions\u003e\\n\u0027 + reinforce + \u0027\\n\u003c/anecdotes_opinions\u003e\u0027);\n}\nparts.push(\u0027\u003caudience_context\u003e\\n\u0027 + (form.audience_context_text || \u0027(not provided)\u0027) + \u0027\\n\u003c/audience_context\u003e\u0027);\nparts.push(\u0027\u003cedited_outline\u003e\\n\u0027 + form.edited_outline + \u0027\\n\u003c/edited_outline\u003e\u0027);\nif (form.internal_links \u0026\u0026 form.internal_links.length \u003e 0) {\n  parts.push(\u0027\u003cinternal_links\u003e\\nAvailable internal URLs for contextual linking. Only use when the surrounding content genuinely matches the URL topic. Use the URL path to judge relevance.\\n\u0027 + form.internal_links.map(u =\u003e \u0027- \u0027 + u).join(\u0027\\n\u0027) + \u0027\\n\u003c/internal_links\u003e\u0027);\n}\nparts.push((targetWC \u003e 0 ? \u0027CRITICAL: You MUST write exactly \u0027 + targetWC + \u0027 words (\\u00b15% tolerance). Count words as you write. Each section MUST hit its word count target.\\n\\n\u0027 : \u0027\u0027) + \u0027Now expand the outline into final blog-post content.\u0027);\nconst userPrompt = parts.join(\u0027\\n\\n\u0027);\n\nreturn [{\n  json: {\n    form,\n    content_model: CONTENT_MODEL,\n    openrouter_api_key: OPENROUTER_API_KEY,\n    openrouter_request: {\n      model: CONTENT_MODEL,\n      messages: [\n        { role: \u0027system\u0027, content: systemPrompt },\n        { role: \u0027user\u0027, content: userPrompt }\n      ],\n      temperature: 0.35,\n      max_tokens: 16384\n    }\n  }\n}];\n"
+                                     },
+                      "id":  "content-build-prompt",
+                      "name":  "Build Content Prompt",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       120,
+                                       600
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://openrouter.ai/api/v1/chat/completions",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{ $json.openrouter_api_key }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "HTTP-Referer",
+                                                                                         "value":  "https://shettymarketing.com"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Title",
+                                                                                         "value":  "Blog Post Creator (n8n)"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ JSON.stringify($json.openrouter_request) }}",
+                                         "options":  {
+                                                         "timeout":  120000
+                                                     }
+                                     },
+                      "id":  "content-openrouter",
+                      "name":  "OpenRouter (Content)",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       340,
+                                       600
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Extract the final markdown content from the OpenRouter response.\nconst resp = $input.first().json;\nconst payload = $(\u0027Build Content Prompt\u0027).first().json;\n\nif (payload.error) {\n  return [{ json: payload }];\n}\n\nif (resp.error) {\n  return [{ json: { error: \u0027OpenRouter returned error\u0027, detail: resp.error } }];\n}\n\nconst content = resp?.choices?.[0]?.message?.content;\nif (!content) {\n  return [{ json: { error: \u0027No content in OpenRouter response\u0027, raw: resp } }];\n}\n\nconst cleaned = content.replace(/^```(?:markdown|md)?\\s*/i, \u0027\u0027).replace(/\\s*```\\s*$/i, \u0027\u0027).trim();\n\nconst wordCount = cleaned.split(/\\s+/).filter(Boolean).length;\nconst h1Count = (cleaned.match(/^#\\s+/gm) || []).length;\nconst h2Count = (cleaned.match(/^##\\s+/gm) || []).length;\nconst h3Count = (cleaned.match(/^###\\s+/gm) || []).length;\n\nreturn [{\n  json: {\n    request: {\n      focus_keyword: payload.form?.focus_keyword,\n      header_keywords: payload.form?.header_keywords,\n      entities: payload.form?.entities,\n      common_keywords: payload.form?.common_keywords,\n      extra_keywords: payload.form?.extra_keywords,\n      target_word_count: payload.form?.target_word_count\n    },\n    content: cleaned,\n    model: payload.content_model,\n    stats: { word_count: wordCount, h1: h1Count, h2: h2Count, h3: h3Count },\n    usage: resp.usage || null,\n    generated_at: new Date().toISOString()\n  }\n}];"
+                                     },
+                      "id":  "content-parse",
+                      "name":  "Parse Content",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       560,
+                                       600
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={{ JSON.stringify($json) }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "content-respond",
+                      "name":  "Respond with Content",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       780,
+                                       600
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+
+                                     },
+                      "id":  "error-trigger",
+                      "name":  "Workflow Error",
+                      "type":  "n8n-nodes-base.errorTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -500,
+                                       1200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={{ JSON.stringify({ error: $json.error?.message || \u0027Unknown workflow error\u0027, node: $json.execution?.error?.node?.name || $json.error?.node || null }) }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "respond-error",
+                      "name":  "Respond with Error JSON",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -300,
+                                       1200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "httpMethod":  "POST",
+                                         "path":  "blog-post-tldr",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+                                                         "allowedOrigins":  "*"
+                                                     }
+                                     },
+                      "id":  "tldr-webhook",
+                      "name":  "TL;DR Webhook",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -500,
+                                       1200
+                                   ],
+                      "webhookId":  "blog-post-tldr"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "loose"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "is-test-cond-tldr",
+                                                                                   "leftValue":  "={{ !!($json.body?.test || $json.test) }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "tldr-is-test",
+                      "name":  "Is TL;DR Test?",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       -300,
+                                       1200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={\n  \"ok\": true,\n  \"message\": \"TL;DR webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "tldr-respond-test",
+                      "name":  "Respond TL;DR Test OK",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -100,
+                                       1100
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Normalize inputs for the blog-post-tldr webhook.\nconst input = $input.first().json;\nconst form = (input \u0026\u0026 typeof input.body === \u0027object\u0027 \u0026\u0026 input.body !== null \u0026\u0026 Object.keys(input.body).length \u003e 0)\n  ? input.body\n  : input;\n\nconst norm = s =\u003e String(s).toLowerCase().replace(/[^a-z0-9]/g, \u0027\u0027);\nconst pick = (...keys) =\u003e {\n  for (const k of keys) {\n    if (form[k] !== undefined \u0026\u0026 form[k] !== null \u0026\u0026 form[k] !== \u0027\u0027) return form[k];\n  }\n  const targets = keys.map(norm);\n  for (const k of Object.keys(form)) {\n    const n = norm(k);\n    if (targets.some(t =\u003e n === t || n.startsWith(t))) return form[k];\n  }\n  return \u0027\u0027;\n};\n\nif (!form.content \u0026\u0026 !form.edited_outline) {\n  return [{ json: { error: \u0027content is required (the blog post markdown).\u0027 } }];\n}\n\nreturn [{\n  json: {\n    topic: pick(\u0027topic\u0027, \u0027Topic\u0027) || \u0027\u0027,\n    focus_keyword: pick(\u0027focus_keyword\u0027, \u0027Focus Keyword\u0027, \u0027focusKeyword\u0027) || \u0027\u0027,\n    content: form.content || form.edited_outline || \u0027\u0027\n  }\n}];"
+                                     },
+                      "id":  "tldr-normalize",
+                      "name":  "Normalize TL;DR Inputs",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -100,
+                                       1200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Build the TL;DR request: call Gemini 2.5 Pro to extract semantic triples.\nconst OPENROUTER_API_KEY = \u0027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\u0027;\nconst TLDR_MODEL = \u0027google/gemini-2.5-pro\u0027;\n\nconst form = $(\u0027Normalize TL;DR Inputs\u0027).first().json;\n\nconst topicLabel = form.topic || form.focus_keyword || \u0027the topic\u0027;\n\nconst systemPrompt = \u0027You are a semantic SEO analyst. Given a blog post\\\u0027s topic and its full content, extract 5-10 semantic triples that directly answer the blog topic, plus a one-sentence TL;DR summary.\\n\\nA semantic triple has three parts:\\n- Subject: the entity or concept being described\\n- Predicate: the relationship or action\\n- Object: the value, entity, or concept linked to the subject\\n\\nExamples of good triples:\\n- \\\"Tesla \\u2192 produces \\u2192 Electric Cars\\\"\\n- \\\"Semantic Search \\u2192 improves \\u2192 User Experience\\\"\\n- \\\"Python \\u2192 isUsedFor \\u2192 AI Development\\\"\\n\\nRULES:\\n1. Every triple must be a factual claim directly supported by the content.\\n2. If the topic is a question, the triples must answer it. If the topic is a statement, the triples must elaborate it.\\n3. Use concise, specific language. Avoid vague predicates like \\\"is related to\\\". Prefer definitive predicates: \\\"improves\\\", \\\"enables\\\", \\\"reduces\\\", \\\"requires\\\", \\\"produces\\\", \\\"increases\\\", \\\"decreases\\\", \\\"powers\\\", \\\"supports\\\", \\\"replaces\\\", \\\"outperforms\\\", \\\"leverages\\\".\\n4. Each Subject should be a recognizable entity or concept from the content \\u2014 not a generic pronoun.\\n5. The tldr_summary must be a single direct sentence answering the topic. No hedging, no \\\"In summary\\\" preface. Subject-Predicate-Object format preferred.\\n6. Extract 5-10 triples. Focus on the most important and distinctive claims from the content.\\n7. Order triples from most fundamental/definitional to most specific/nuanced.\\n\\nOUTPUT: Valid JSON only. No markdown code fences. No prose outside JSON. Schema exactly:\\n{\\n  \\\"tldr_summary\\\": \\\"A single direct sentence answering the topic in subject-predicate-object form.\\\",\\n  \\\"tldr_triples\\\": [\\n    { \\\"subject\\\": \\\"...\\\", \\\"predicate\\\": \\\"...\\\", \\\"object\\\": \\\"...\\\" }\\n  ]\\n}\u0027;\n\nconst userPrompt = \u0027TOPIC: \u0027 + topicLabel + \u0027\\n\\nBelow is the full blog post content. Extract 5-10 semantic triples (Subject \\u2192 Predicate \\u2192 Object) that directly answer the topic, plus a one-sentence TL;DR summary.\\n\\n\u003ccontent\u003e\\n\u0027 + form.content + \u0027\\n\u003c/content\u003e\\n\\nReturn the JSON now.\u0027;\n\nreturn [{\n  json: {\n    openrouter_api_key: OPENROUTER_API_KEY,\n    openrouter_request: {\n      model: TLDR_MODEL,\n      messages: [\n        { role: \u0027system\u0027, content: systemPrompt },\n        { role: \u0027user\u0027, content: userPrompt }\n      ],\n      temperature: 0.2,\n      response_format: { type: \u0027json_object\u0027 }\n    },\n    tldr_model: TLDR_MODEL,\n    form\n  }\n}];"
+                                     },
+                      "id":  "tldr-llm-prompt",
+                      "name":  "Generate TL;DR",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       120,
+                                       1200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://openrouter.ai/api/v1/chat/completions",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "=Bearer {{ $json.openrouter_api_key }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "HTTP-Referer",
+                                                                                         "value":  "https://shettymarketing.com"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "X-Title",
+                                                                                         "value":  "Blog Post Creator :: TL;DR (n8n)"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{ JSON.stringify($json.openrouter_request) }}",
+                                         "options":  {
+                                                         "timeout":  60000
+                                                     }
+                                     },
+                      "id":  "tldr-openrouter",
+                      "name":  "OpenRouter (TL;DR)",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       340,
+                                       1200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "language":  "javaScript",
+                                         "jsCode":  "// Parse the TL;DR JSON from the OpenRouter response.\nconst resp = $input.first().json;\nconst payload = $(\u0027Generate TL;DR\u0027).first().json;\n\nif (resp.error) {\n  return [{ json: { error: \u0027OpenRouter returned error\u0027, detail: resp.error } }];\n}\n\nconst text = resp?.choices?.[0]?.message?.content;\nif (!text) {\n  return [{ json: { error: \u0027No content in OpenRouter response\u0027, raw: resp } }];\n}\n\nlet parsed;\ntry {\n  parsed = JSON.parse(text);\n} catch {\n  const cleaned = text.replace(/^```(?:json)?\\s*/i, \u0027\u0027).replace(/\\s*```\\s*$/i, \u0027\u0027).trim();\n  try { parsed = JSON.parse(cleaned); } catch {\n    return [{ json: { error: \u0027Failed to parse JSON from model\u0027, raw_text: text } }];\n  }\n}\n\nreturn [{ json: {\n  tldr_summary: parsed.tldr_summary || \u0027\u0027,\n  tldr_triples: Array.isArray(parsed.tldr_triples) ? parsed.tldr_triples : [],\n  model: payload.tldr_model,\n  usage: resp.usage || null,\n  generated_at: new Date().toISOString()\n} }];"
+                                     },
+                      "id":  "tldr-parse",
+                      "name":  "Parse TL;DR",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       560,
+                                       1200
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={{ JSON.stringify($json) }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "tldr-respond",
+                      "name":  "Respond with TL;DR",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1,
+                      "position":  [
+                                       780,
+                                       1200
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "Outline Webhook":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "Is Outline Test?",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "Is Outline Test?":  {
+                                                 "main":  [
+                                                              [
+                                                                  {
+                                                                      "node":  "Respond Outline Test OK",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ],
+                                                              [
+                                                                  {
+                                                                      "node":  "Normalize Outline Inputs",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ]
+                                                          ]
+                                             },
+                        "Normalize Outline Inputs":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "Stats Scrape",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "Stats Scrape":  {
+                                             "main":  [
+                                                          [
+                                                              {
+                                                                  "node":  "Build Outline Prompt",
+                                                                  "type":  "main",
+                                                                  "index":  0
+                                                              }
+                                                          ]
+                                                      ]
+                                         },
+                        "Build Outline Prompt":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "OpenRouter (Outline)",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "OpenRouter (Outline)":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "Parse Outline",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "Parse Outline":  {
+                                              "main":  [
+                                                           [
+                                                               {
+                                                                   "node":  "Respond with Outline",
+                                                                   "type":  "main",
+                                                                   "index":  0
+                                                               }
+                                                           ]
+                                                       ]
+                                          },
+                        "Content Webhook":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "Is Content Test?",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "Is Content Test?":  {
+                                                 "main":  [
+                                                              [
+                                                                  {
+                                                                      "node":  "Respond Content Test OK",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ],
+                                                              [
+                                                                  {
+                                                                      "node":  "Normalize Content Inputs",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ]
+                                                          ]
+                                             },
+                        "Normalize Content Inputs":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "Build Content Prompt",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "Build Content Prompt":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "OpenRouter (Content)",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "OpenRouter (Content)":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "Parse Content",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "Parse Content":  {
+                                              "main":  [
+                                                           [
+                                                               {
+                                                                   "node":  "Respond with Content",
+                                                                   "type":  "main",
+                                                                   "index":  0
+                                                               }
+                                                           ]
+                                                       ]
+                                          },
+                        "Workflow Error":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "Respond with Error JSON",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           },
+                        "TL;DR Webhook":  {
+                                              "main":  [
+                                                           [
+                                                               {
+                                                                   "node":  "Is TL;DR Test?",
+                                                                   "type":  "main",
+                                                                   "index":  0
+                                                               }
+                                                           ]
+                                                       ]
+                                          },
+                        "Is TL;DR Test?":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "Respond TL;DR Test OK",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ],
+                                                            [
+                                                                {
+                                                                    "node":  "Normalize TL;DR Inputs",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           },
+                        "Normalize TL;DR Inputs":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "Generate TL;DR",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   },
+                        "Generate TL;DR":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "OpenRouter (TL;DR)",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           },
+                        "OpenRouter (TL;DR)":  {
+                                                   "main":  [
+                                                                [
+                                                                    {
+                                                                        "node":  "Parse TL;DR",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                                ]
+                                                            ]
+                                               },
+                        "Parse TL;DR":  {
+                                            "main":  [
+                                                         [
+                                                             {
+                                                                 "node":  "Respond with TL;DR",
+                                                                 "type":  "main",
+                                                                 "index":  0
+                                                             }
+                                                         ]
+                                                     ]
+                                        }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 },
+    "pinData":  {
+
+                },
+    "meta":  {
+                 "templateCredsSetupCompleted":  false
+             },
+    "tags":  [
+
+             ]
+}

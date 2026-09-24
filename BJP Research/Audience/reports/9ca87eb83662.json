@@ -1,0 +1,67 @@
+{
+  "total_monthly_volume": 34660,
+  "unique_audience": 22529,
+  "tam": 31540,
+  "demographic_segments": [],
+  "geo_segments": [],
+  "intent_segments": {
+    "informational": {
+      "volume": 34150,
+      "pct": 98.5
+    },
+    "commercial": {
+      "volume": 500,
+      "pct": 1.4
+    },
+    "transactional": {
+      "volume": 10,
+      "pct": 0.0
+    },
+    "navigational": {
+      "volume": 0,
+      "pct": 0.0
+    }
+  },
+  "commercial_market": {
+    "audience_size": 315,
+    "avg_cpc": 3.51
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 0,
+    "declining": 5
+  },
+  "competition_level": "LOW",
+  "avg_cpc": 3.51,
+  "report_id": "9ca87eb83662",
+  "description": "UK software engineers seeking remote AI jobs and coding bootcamps",
+  "location_name": "United Kingdom",
+  "language_code": "en",
+  "depth": "balanced",
+  "seed_keywords": [
+    "remote ai jobs uk",
+    "software engineer jobs remote uk",
+    "ai coding bootcamps uk",
+    "best ai courses london",
+    "remote machine learning engineer jobs",
+    "coding bootcamps online ai",
+    "ai developer jobs uk remote",
+    "junior ai engineer roles uk",
+    "machine learning bootcamp london",
+    "remote software developer ai",
+    "ai job boards uk",
+    "uk tech job sites",
+    "data science bootcamps uk",
+    "ai engineer salary uk",
+    "how to become ai engineer uk",
+    "remote ai jobs entry level",
+    "best coding bootcamps for ai",
+    "ai ethics courses uk",
+    "part time ai bootcamp uk",
+    "ai and machine learning jobs",
+    "remote jobs uk",
+    "ai bootcamp",
+    "python developer jobs"
+  ],
+  "seed_count": 23
+}

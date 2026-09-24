@@ -1,0 +1,30 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "mcp": {
+    "dataforseo": {
+      "type": "local",
+      "command": ["npx", "-y", "dataforseo-mcp-server"],
+      "enabled": true,
+      "environment": {
+        "DATAFORSEO_LOGIN": "abhishekbolarshetty@gmail.com",
+        "DATAFORSEO_PASSWORD": "6aa69ca0a4bf8188"
+      }
+    },
+
+    "firecrawl": {
+      "type": "local",
+      "command": ["npx", "-y", "firecrawl-mcp"],
+      "enabled": true,
+      "environment": {
+        "FIRECRAWL_API_KEY": "fc-79ed532c5804415d8503b3edd18750e0"
+      }
+    },
+
+    "exa": {
+      "type": "remote",
+      "url": "https://mcp.exa.ai/mcp",
+      "enabled": true
+    }
+  }
+}

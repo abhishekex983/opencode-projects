@@ -1,0 +1,15 @@
+{
+  "_comment_1":      "Fill in the values below. See README.txt for where to get each one.",
+
+  "target_domain":   "https://letthemnotice.com/",
+  "sheet_id":        "1C9mJVEcJNfHXB5nU0ygMWinVif7ceKZ5KJbO5dit8Qg",
+  "sheets_api_key":  "AIzaSyBBterOACVb--zWfieJrnsq0cFNZ9I0wDs",
+  "apps_script_url": "https://script.google.com/macros/s/AKfycbyesual9VBPQhBrptrZBBqAcWDb0YrC0YyUlHEQPHWKXwwumnKakg6n2lCnCe1VykAxjA/exec",
+
+  "_comment_2":      "Optional — usually leave as defaults",
+
+  "input_tab":       "URLs",
+  "results_tab":     "Results",
+  "concurrency":     20,
+  "timeout_seconds": 15
+}

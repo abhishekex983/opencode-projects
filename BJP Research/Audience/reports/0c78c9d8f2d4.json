@@ -1,0 +1,552 @@
+{
+  "total_monthly_volume": 17731040,
+  "unique_audience": 11525176,
+  "tam": 16135246,
+  "demographic_segments": [
+    {
+      "age_group": "25-34",
+      "gender": "male",
+      "audience_size": 1681454
+    },
+    {
+      "age_group": "25-34",
+      "gender": "female",
+      "audience_size": 1061537
+    },
+    {
+      "age_group": "35-44",
+      "gender": "male",
+      "audience_size": 4359063
+    },
+    {
+      "age_group": "35-44",
+      "gender": "female",
+      "audience_size": 2751970
+    },
+    {
+      "age_group": "45-54",
+      "gender": "male",
+      "audience_size": 1017350
+    },
+    {
+      "age_group": "45-54",
+      "gender": "female",
+      "audience_size": 642275
+    }
+  ],
+  "geo_segments": [
+    {
+      "region": "Andhra Pradesh",
+      "audience_size": 1990913,
+      "interest": 360
+    },
+    {
+      "region": "Gujarat",
+      "audience_size": 1122653,
+      "interest": 203
+    },
+    {
+      "region": "Maharashtra",
+      "audience_size": 840607,
+      "interest": 152
+    },
+    {
+      "region": "Assam",
+      "audience_size": 757653,
+      "interest": 137
+    },
+    {
+      "region": "Chhattisgarh",
+      "audience_size": 669168,
+      "interest": 121
+    },
+    {
+      "region": "West Bengal",
+      "audience_size": 635986,
+      "interest": 115
+    },
+    {
+      "region": "Nagaland",
+      "audience_size": 553031,
+      "interest": 100
+    },
+    {
+      "region": "Telangana",
+      "audience_size": 492198,
+      "interest": 89
+    },
+    {
+      "region": "Karnataka",
+      "audience_size": 431364,
+      "interest": 78
+    },
+    {
+      "region": "Chandigarh",
+      "audience_size": 425834,
+      "interest": 77
+    }
+  ],
+  "intent_segments": {
+    "commercial": {
+      "volume": 11114980,
+      "pct": 62.7
+    },
+    "transactional": {
+      "volume": 4098770,
+      "pct": 23.1
+    },
+    "informational": {
+      "volume": 2320760,
+      "pct": 13.1
+    },
+    "navigational": {
+      "volume": 196530,
+      "pct": 1.1
+    }
+  },
+  "top_keywords": [
+    {
+      "keyword": "sip calculator",
+      "search_volume": 3350000,
+      "cpc": 0.11,
+      "competition": "MEDIUM",
+      "intent": "transactional",
+      "trend": "declining"
+    },
+    {
+      "keyword": "sip plan calculator",
+      "search_volume": 3350000,
+      "cpc": 0.11,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "declining"
+    },
+    {
+      "keyword": "systematic investment plan calculator",
+      "search_volume": 3350000,
+      "cpc": 0.11,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "declining"
+    },
+    {
+      "keyword": "sip investment plan calculator",
+      "search_volume": 3350000,
+      "cpc": 0.11,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "declining"
+    },
+    {
+      "keyword": "swp calculator",
+      "search_volume": 450000,
+      "cpc": 0.12,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "declining"
+    },
+    {
+      "keyword": "mutual fund calculator",
+      "search_volume": 201000,
+      "cpc": 0.19,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "mutual funds",
+      "search_volume": 201000,
+      "cpc": 1.04,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip",
+      "search_volume": 201000,
+      "cpc": 0.6,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "mf calculator",
+      "search_volume": 201000,
+      "cpc": 0.19,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "muchal found",
+      "search_volume": 201000,
+      "cpc": 1.04,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "lumpsum calculator",
+      "search_volume": 165000,
+      "cpc": 0.15,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "step up sip calculator",
+      "search_volume": 165000,
+      "cpc": 0.08,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip return calculator",
+      "search_volume": 110000,
+      "cpc": 0.19,
+      "competition": "MEDIUM",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip calculator sbi",
+      "search_volume": 110000,
+      "cpc": 0.28,
+      "competition": "LOW",
+      "intent": "navigational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip return calculator sbi",
+      "search_volume": 110000,
+      "cpc": 0.28,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "nifty 50 index fund",
+      "search_volume": 110000,
+      "cpc": 0.94,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip investment",
+      "search_volume": 90500,
+      "cpc": 1.07,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "systematic investment plan",
+      "search_volume": 90500,
+      "cpc": 1.07,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "qqq",
+      "search_volume": 74000,
+      "cpc": 0.33,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "nippon india mutual fund",
+      "search_volume": 74000,
+      "cpc": 0.65,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "groww sip calculator",
+      "search_volume": 60500,
+      "cpc": 0.2,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "grow sip calculator",
+      "search_volume": 60500,
+      "cpc": 0.2,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "exchange traded funds",
+      "search_volume": 60500,
+      "cpc": 1.27,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "nippon india small cap fund",
+      "search_volume": 60500,
+      "cpc": 0.57,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "indian stock market today",
+      "search_volume": 60500,
+      "cpc": 0.19,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "mutual fund sip calculator",
+      "search_volume": 49500,
+      "cpc": 0.26,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip calculator groww",
+      "search_volume": 49500,
+      "cpc": 0.13,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip calculator grow",
+      "search_volume": 49500,
+      "cpc": 0.13,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "s&p 500 index",
+      "search_volume": 49500,
+      "cpc": 2.56,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "dsp mutual fund",
+      "search_volume": 33100,
+      "cpc": 0.93,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "mutual fund return calculator",
+      "search_volume": 27100,
+      "cpc": 0.25,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sbi sip plan",
+      "search_volume": 27100,
+      "cpc": 0.93,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "lump sum sip calculator",
+      "search_volume": 27100,
+      "cpc": 0.08,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip lumpsum calculator",
+      "search_volume": 27100,
+      "cpc": 0.08,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip sbi",
+      "search_volume": 27100,
+      "cpc": 0.93,
+      "competition": "LOW",
+      "intent": "navigational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sbi sip",
+      "search_volume": 27100,
+      "cpc": 0.93,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "aditya birla mutual fund",
+      "search_volume": 27100,
+      "cpc": 0.1,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "index funds",
+      "search_volume": 22200,
+      "cpc": 1.2,
+      "competition": "LOW",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "best sip to invest",
+      "search_volume": 22200,
+      "cpc": 1.14,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "best sip plans",
+      "search_volume": 22200,
+      "cpc": 1.14,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "best sip investment plan",
+      "search_volume": 22200,
+      "cpc": 1.14,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "good sip to invest",
+      "search_volume": 22200,
+      "cpc": 1.14,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "mutual fund investment",
+      "search_volume": 22200,
+      "cpc": 1.03,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "nippon india growth fund",
+      "search_volume": 22200,
+      "cpc": 1.07,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "nippon india large cap fund",
+      "search_volume": 22200,
+      "cpc": 0.82,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "best mutual fund to invest",
+      "search_volume": 18100,
+      "cpc": 0.7,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "nippon small cap fund",
+      "search_volume": 18100,
+      "cpc": 0.83,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "nippon mutual fund",
+      "search_volume": 18100,
+      "cpc": 0.7,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "good mutual funds to invest",
+      "search_volume": 18100,
+      "cpc": 0.75,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "sip calculator monthly",
+      "search_volume": 14800,
+      "cpc": 0.26,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    }
+  ],
+  "commercial_market": {
+    "audience_size": 7226285,
+    "avg_cpc": 0.92
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 0,
+    "declining": 5
+  },
+  "competition_level": "LOW",
+  "avg_cpc": 0.92,
+  "report_id": "0c78c9d8f2d4",
+  "description": "Indian working professionals interested in mutual funds and SIP investments",
+  "location_name": "India",
+  "language_code": "en",
+  "seed_keywords": [
+    "best mutual funds india",
+    "sip investment plans",
+    "mutual fund calculator",
+    "tax saving mutual funds",
+    "how to invest in sip",
+    "mutual fund returns comparison",
+    "mutual funds for beginners india",
+    "top performing mutual funds india",
+    "direct mutual funds vs regular",
+    "best elss mutual funds",
+    "sip calculator monthly",
+    "mutual fund investment app india",
+    "low risk mutual funds india",
+    "mutual fund investment guide",
+    "best small cap mutual funds",
+    "mutual fund nav today",
+    "how to choose a mutual fund",
+    "mutual fund taxation india",
+    "sip investment benefits",
+    "growth mutual funds india",
+    "mutual funds",
+    "sip",
+    "elss",
+    "index funds",
+    "stock market india"
+  ],
+  "expanded_count": 400
+}

@@ -1,0 +1,264 @@
+{
+  "name": "SERP Analysis - Search",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## SERP Analysis — Step 1: Search\n\n**Flow:**\n1. Webhook accepts `{ keyword, location, language, device, depth }`.\n2. Normalize input (depth clamped to 10–50, default 30).\n3. DataForSEO `/serp/google/organic/live/advanced` returns the live SERP.\n4. Prune to organic listings + SERP features (PAA, related, AI overview, featured snippet, packs).\n5. Respond — used by the dashboard's picker UI to let the user hand-select competitors.\n\n**Before running:**\n- Activate workflow, copy Production URL into `on-page-app.html` → SERP Analysis → Search webhook URL.\n- DataForSEO node: wire to your HTTP Basic Auth credential (login + password).\n- CORS is `*` for local dev; lock down for production.\n\n**Output shape (consumed by picker UI):**\n```\n{\n  results: [{ position, title, url, domain, description, breadcrumb }, ...],\n  features: {\n    people_also_ask: [...],\n    related_searches: [...],\n    featured_snippet, ai_overview, knowledge_graph,\n    video_pack_present, image_pack_present, shopping_pack_present, local_pack_present\n  },\n  request, generated_at\n}\n```\n\n**Cost / latency:** 1 DataForSEO call. ~10–20s end-to-end.",
+        "height": 480,
+        "width": 400
+      },
+      "id": "1f79e1bd-ef7a-4758-aa25-0a696eb2ab01",
+      "name": "README",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "serp-analysis-search",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "cbcd7e93-a5c6-46f1-93ec-caebb6ef8cf4",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        480
+      ],
+      "webhookId": "serp-analysis-search-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-test-cond",
+              "leftValue": "={{ !!($json.body?.test || $json.test) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4e874efd-37d1-4c3c-b962-0d1463135977",
+      "name": "Is Test?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"message\": \"SERP Analysis (search) webhook reachable\",\n  \"received_at\": \"{{ $now.toISO() }}\"\n}",
+        "options": {}
+      },
+      "id": "ed4b486c-8856-43a3-a493-ff0221954f7f",
+      "name": "Respond Test OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        608,
+        608
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = (input && typeof input.body === 'object' && input.body !== null) ? input.body : input;\n\nconst keyword = String(body.keyword || '').trim();\nif (!keyword) throw new Error('keyword is required');\n\nconst location = String(body.location || 'United States').trim();\nif (!location) throw new Error('location is required');\n\nlet depth = Number(body.depth);\nif (!Number.isFinite(depth)) depth = 30;\ndepth = Math.min(Math.max(depth, 10), 50);\n\nreturn [{\n  json: {\n    keyword,\n    location,\n    language: String(body.language || 'en').trim(),\n    device: String(body.device || 'desktop').trim(),\n    depth,\n    requested_at: body.requested_at || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "555e2fb6-b3e2-4750-b452-cb674c007aba",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        608,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst dfs_body = [{\n  keyword: input.keyword,\n  location_name: input.location,\n  language_code: input.language,\n  device: input.device,\n  depth: input.depth\n}];\nreturn [{ json: { ...input, dfs_body } }];"
+      },
+      "id": "897467b6-9f05-4915-910d-95b297254492",
+      "name": "Build DataForSEO Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.dataforseo.com/v3/serp/google/organic/live/advanced",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.dfs_body) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "50c2b2ec-c53e-4ebb-88d1-dcee974a9f1f",
+      "name": "DataForSEO SERP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        368
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "NWN27AhET6O78Sh3",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const inputs = $('Normalize Input').first().json;\nconst serpResp = $input.first().json;\nconst taskResult = serpResp && serpResp.tasks && serpResp.tasks[0] && serpResp.tasks[0].result && serpResp.tasks[0].result[0];\n\nif (!taskResult) {\n  return [{\n    json: {\n      error: 'No SERP result from DataForSEO',\n      detail: serpResp && (serpResp.status_message || serpResp.tasks)\n    }\n  }];\n}\n\nconst items = taskResult.items || [];\nconst organic = items\n  .filter(i => i.type === 'organic')\n  .slice(0, inputs.depth)\n  .map(r => ({\n    position: r.rank_absolute,\n    title: r.title,\n    url: r.url,\n    description: r.description,\n    domain: r.domain,\n    breadcrumb: r.breadcrumb || ''\n  }));\n\nconst paaItem = items.find(i => i.type === 'people_also_ask');\nconst paa = paaItem ? (paaItem.items || []).slice(0, 8).map(q => q.title).filter(Boolean) : [];\nconst relatedItem = items.find(i => i.type === 'related_searches');\nconst related = relatedItem ? (relatedItem.items || []).slice(0, 10) : [];\nconst featured = items.find(i => i.type === 'featured_snippet') || null;\nconst aiOverview = items.find(i => i.type === 'ai_overview') || null;\nconst knowledgeGraph = items.find(i => i.type === 'knowledge_graph') || null;\nconst videoPack = items.find(i => i.type === 'video') || items.find(i => i.type === 'videos');\nconst imagePack = items.find(i => i.type === 'images');\nconst shopping = items.find(i => i.type === 'shopping');\nconst localPack = items.find(i => i.type === 'local_pack');\n\nreturn [{\n  json: {\n    results: organic,\n    features: {\n      people_also_ask: paa,\n      related_searches: related,\n      featured_snippet: featured ? { title: featured.title, description: featured.description, url: featured.url } : null,\n      ai_overview: aiOverview ? { present: true } : null,\n      knowledge_graph: knowledgeGraph ? { title: knowledgeGraph.title, description: knowledgeGraph.description } : null,\n      video_pack_present: !!videoPack,\n      image_pack_present: !!imagePack,\n      shopping_pack_present: !!shopping,\n      local_pack_present: !!localPack\n    },\n    request: {\n      keyword: inputs.keyword,\n      location: inputs.location,\n      language: inputs.language,\n      device: inputs.device,\n      depth: inputs.depth\n    },\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "63b87da5-ad0f-4f91-a4ba-24cc3ceb15a4",
+      "name": "Prune SERP",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "16f8d663-6433-4660-af94-a796eb1bd8e0",
+      "name": "Respond with Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1424,
+        368
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Is Test?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Test?": {
+      "main": [
+        [
+          {
+            "node": "Respond Test OK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Build DataForSEO Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build DataForSEO Request": {
+      "main": [
+        [
+          {
+            "node": "DataForSEO SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DataForSEO SERP": {
+      "main": [
+        [
+          {
+            "node": "Prune SERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prune SERP": {
+      "main": [
+        [
+          {
+            "node": "Respond with Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3ef6add0-87eb-4f76-920a-39c7e2d18528",
+  "meta": {
+    "instanceId": "85aa62db498652bf5abcecbe93e8f8d7dc29c844051f21336ff396b0b8794328"
+  },
+  "id": "eouTmO37B5gsVFyE",
+  "tags": []
+}

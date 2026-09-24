@@ -1,0 +1,40 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const personJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Abhishek Bolar Shetty",
+  "url": "https://shettymarketing.com",
+  "jobTitle": "SEO & Digital Marketing Specialist",
+  "description": "15+ years of experience driving organic growth through SEO, content strategy, and marketing automation.",
+  "email": "abhishekbolarshetty@gmail.com",
+  "sameAs": [
+    "https://www.linkedin.com/in/abhishekdigimarketing/"
+  ],
+  "knowsAbout": [
+    "Search Engine Optimization",
+    "Keyword Research",
+    "On-Page SEO",
+    "Technical SEO",
+    "Off-Page SEO",
+    "Content Marketing",
+    "Digital Marketing"
+  ]
+};
+---
+
+<Layout
+  title="Shetty Marketing — SEO & Digital Marketing Specialist"
+  description="Abhishek Bolar Shetty — 15+ years navigating the web, one ranking at a time. SEO strategy, keyword research, technical SEO, and marketing tools built from scratch."
+  jsonLd={personJsonLd}
+>
+  <main id="main-content">
+    <!-- Placeholder: sections will be built here matching design.md -->
+    <section style="min-height:100vh; display:flex; align-items:center; justify-content:center; font-family:var(--font-sans);">
+      <p style="color:var(--color-navy); font-size:1.25rem; font-weight:600;">
+        Shetty Marketing — coming soon.
+      </p>
+    </section>
+  </main>
+</Layout>

@@ -1,0 +1,110 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "← New Analysis" [ref=e5] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e6]:
+        - link "Download CSV" [ref=e7] [cursor=pointer]:
+          - /url: /download/0bdbe04744ab/csv
+        - link "Download JSON" [ref=e8] [cursor=pointer]:
+          - /url: /download/0bdbe04744ab/json
+    - heading "Audience Research Report" [level=1] [ref=e9]
+    - paragraph [ref=e10]: "Audience: Australian travelers looking for flight deals and holiday packages to Bali"
+    - paragraph [ref=e11]: "Location: Australia · Depth: Full · Report ID: 0bdbe04744ab"
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: Monthly Search Volume
+        - generic [ref=e16]: 82,160
+      - generic [ref=e17]:
+        - generic [ref=e18]: Unique Audience
+        - generic [ref=e19]: 53,404
+      - generic [ref=e20]:
+        - generic [ref=e21]: TAM
+        - generic [ref=e22]: 74,765
+      - generic [ref=e23]:
+        - generic [ref=e24]: Avg CPC
+        - generic [ref=e25]: $1.21
+    - generic [ref=e26]:
+      - generic [ref=e27]:
+        - generic [ref=e28]: Competition Level
+        - generic [ref=e29]: HIGH
+      - generic [ref=e30]:
+        - generic [ref=e31]: Commercial Audience
+        - generic [ref=e32]: 53,404
+        - generic [ref=e33]: "Avg CPC: $1.21"
+    - generic [ref=e34]:
+      - heading "Search Intent Breakdown" [level=2] [ref=e35]
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]: Commercial
+          - generic [ref=e41]: 82,140 (100.0%)
+        - generic [ref=e42]:
+          - generic [ref=e43]: Informational
+          - generic [ref=e45]: 20 (0.0%)
+        - generic [ref=e46]:
+          - generic [ref=e47]: Transactional
+          - generic [ref=e49]: 0 (0.0%)
+    - generic [ref=e50]:
+      - heading "Trend Direction" [level=2] [ref=e51]
+      - generic [ref=e52]:
+        - generic [ref=e53]: "Growing: 0"
+        - generic [ref=e54]: "Stable: 5"
+        - generic [ref=e55]: "Declining: 0"
+    - generic [ref=e56]:
+      - heading "Demographics" [level=2] [ref=e57]
+      - table [ref=e58]:
+        - rowgroup [ref=e59]:
+          - row "Age Group Gender Audience Size" [ref=e60]:
+            - columnheader "Age Group" [ref=e61]
+            - columnheader "Gender" [ref=e62]
+            - columnheader "Audience Size" [ref=e63]
+        - rowgroup [ref=e64]:
+          - row "25-34 Male 6,218" [ref=e65]:
+            - cell "25-34" [ref=e66]
+            - cell "Male" [ref=e67]
+            - cell "6,218" [ref=e68]
+          - row "25-34 Female 8,948" [ref=e69]:
+            - cell "25-34" [ref=e70]
+            - cell "Female" [ref=e71]
+            - cell "8,948" [ref=e72]
+          - row "35-44 Male 12,852" [ref=e73]:
+            - cell "35-44" [ref=e74]
+            - cell "Male" [ref=e75]
+            - cell "12,852" [ref=e76]
+          - row "35-44 Female 18,495" [ref=e77]:
+            - cell "35-44" [ref=e78]
+            - cell "Female" [ref=e79]
+            - cell "18,495" [ref=e80]
+          - row "45-54 Male 2,824" [ref=e81]:
+            - cell "45-54" [ref=e82]
+            - cell "Male" [ref=e83]
+            - cell "2,824" [ref=e84]
+          - row "45-54 Female 4,064" [ref=e85]:
+            - cell "45-54" [ref=e86]
+            - cell "Female" [ref=e87]
+            - cell "4,064" [ref=e88]
+    - generic [ref=e89]:
+      - heading "Geographic Distribution" [level=2] [ref=e90]
+      - generic [ref=e91]:
+        - generic [ref=e92]:
+          - generic [ref=e93]: Western Australia
+          - generic [ref=e96]: 14,089
+        - generic [ref=e97]:
+          - generic [ref=e98]: Tasmania
+          - generic [ref=e101]: 8,951
+        - generic [ref=e102]:
+          - generic [ref=e103]: Queensland
+          - generic [ref=e106]: 8,398
+        - generic [ref=e107]:
+          - generic [ref=e108]: Victoria
+          - generic [ref=e111]: 7,629
+        - generic [ref=e112]:
+          - generic [ref=e113]: South Australia
+          - generic [ref=e116]: 6,337
+        - generic [ref=e117]:
+          - generic [ref=e118]: New South Wales
+          - generic [ref=e121]: 6,214
+        - generic [ref=e122]:
+          - generic [ref=e123]: Australian Capital Territory
+          - generic [ref=e126]: 1,784

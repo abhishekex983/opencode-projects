@@ -1,0 +1,11 @@
+@page "/"
+@inject NavigationManager Nav
+
+<div class="gantt-wrapper">
+    <iframe id="ganttFrame" src="gantt/gantt.html" title="Gantt Chart" @ref="ganttFrame"></iframe>
+    <div class="net-badge">.NET + Blazor</div>
+</div>
+
+@code {
+    private ElementReference ganttFrame;
+}

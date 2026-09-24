@@ -1,0 +1,170 @@
+{
+  "total_monthly_volume": 144130,
+  "unique_audience": 93684,
+  "tam": 131157,
+  "demographic_segments": [
+    {
+      "age_group": "18-24",
+      "gender": "male",
+      "audience_size": 2460
+    },
+    {
+      "age_group": "18-24",
+      "gender": "female",
+      "audience_size": 3722
+    },
+    {
+      "age_group": "25-34",
+      "gender": "male",
+      "audience_size": 9097
+    },
+    {
+      "age_group": "25-34",
+      "gender": "female",
+      "audience_size": 13761
+    },
+    {
+      "age_group": "35-44",
+      "gender": "male",
+      "audience_size": 14504
+    },
+    {
+      "age_group": "35-44",
+      "gender": "female",
+      "audience_size": 21938
+    },
+    {
+      "age_group": "45-54",
+      "gender": "male",
+      "audience_size": 2982
+    },
+    {
+      "age_group": "45-54",
+      "gender": "female",
+      "audience_size": 4511
+    },
+    {
+      "age_group": "55-64",
+      "gender": "male",
+      "audience_size": 8202
+    },
+    {
+      "age_group": "55-64",
+      "gender": "female",
+      "audience_size": 12407
+    }
+  ],
+  "geo_segments": [
+    {
+      "region": "Ontario",
+      "audience_size": 20676,
+      "interest": 484
+    },
+    {
+      "region": "British Columbia",
+      "audience_size": 13029,
+      "interest": 305
+    },
+    {
+      "region": "Alberta",
+      "audience_size": 12217,
+      "interest": 286
+    },
+    {
+      "region": "Manitoba",
+      "audience_size": 11320,
+      "interest": 265
+    },
+    {
+      "region": "New Brunswick",
+      "audience_size": 9654,
+      "interest": 226
+    },
+    {
+      "region": "Nova Scotia",
+      "audience_size": 6536,
+      "interest": 153
+    },
+    {
+      "region": "Newfoundland and Labrador",
+      "audience_size": 6023,
+      "interest": 141
+    },
+    {
+      "region": "Quebec",
+      "audience_size": 5425,
+      "interest": 127
+    },
+    {
+      "region": "Saskatchewan",
+      "audience_size": 4741,
+      "interest": 111
+    },
+    {
+      "region": "Prince Edward Island",
+      "audience_size": 4058,
+      "interest": 95
+    }
+  ],
+  "intent_segments": {
+    "commercial": {
+      "volume": 115930,
+      "pct": 80.4
+    },
+    "informational": {
+      "volume": 17700,
+      "pct": 12.3
+    },
+    "transactional": {
+      "volume": 8100,
+      "pct": 5.6
+    },
+    "navigational": {
+      "volume": 2400,
+      "pct": 1.7
+    }
+  },
+  "commercial_market": {
+    "audience_size": 75321,
+    "avg_cpc": 2.4
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 0,
+    "declining": 5
+  },
+  "competition_level": "LOW",
+  "avg_cpc": 2.4,
+  "report_id": "87e725930587",
+  "description": "Canadian parents looking for baby products and childcare services",
+  "location_name": "Canada",
+  "language_code": "en",
+  "depth": "full",
+  "seed_keywords": [
+    "best baby stores canada",
+    "baby formula shortage canada",
+    "daycare near me",
+    "cheap diapers online canada",
+    "baby clothing sale canada",
+    "infant car seat reviews canada",
+    "potty training tips",
+    "baby registry canada",
+    "pediatricians near me",
+    "parenting support groups canada",
+    "child care subsidy canada",
+    "organic baby food brands canada",
+    "best strollers canada reviews",
+    "newborn essentials checklist",
+    "vaccination schedule canada",
+    "baby sleep training methods",
+    "postpartum depression support canada",
+    "affordable daycare toronto",
+    "best baby monitors canada",
+    "early childhood education programs canada",
+    "baby products canada",
+    "childcare services",
+    "baby formula",
+    "strollers"
+  ],
+  "seed_count": 24
+}

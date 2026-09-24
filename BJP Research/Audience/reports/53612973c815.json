@@ -1,0 +1,57 @@
+{
+  "total_monthly_volume": 158860,
+  "unique_audience": 103259,
+  "tam": 144562,
+  "demographic_segments": [],
+  "geo_segments": [],
+  "intent_segments": {
+    "informational": {
+      "volume": 158860,
+      "pct": 100.0
+    }
+  },
+  "commercial_market": {
+    "audience_size": 0,
+    "avg_cpc": 1.3
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 0,
+    "declining": 0
+  },
+  "competition_level": "LOW",
+  "avg_cpc": 1.3,
+  "report_id": "53612973c815",
+  "description": "Canadian parents looking for baby products and childcare services",
+  "location_name": "Canada",
+  "language_code": "en",
+  "depth": "minimal",
+  "seed_keywords": [
+    "baby stores near me",
+    "best baby formula canada",
+    "cheap diapers online canada",
+    "daycare centers toronto",
+    "affordable childcare vancouver",
+    "infant car seats canada reviews",
+    "organic baby food delivery",
+    "potty training tips",
+    "baby sleep consultants canada",
+    "postpartum support groups near me",
+    "best baby monitors canada",
+    "where to buy baby clothes online",
+    "pediatricians accepting new patients",
+    "baby proofing services",
+    "child tax benefit application",
+    "how to apply for maternity leave",
+    "baby registry canada",
+    "diaper rash cream",
+    "infant cpr courses",
+    "baby feeding schedule",
+    "baby products canada",
+    "childcare services",
+    "daycare near me",
+    "baby formula",
+    "strollers"
+  ],
+  "seed_count": 25
+}

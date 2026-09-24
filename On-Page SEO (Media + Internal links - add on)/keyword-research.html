@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Keyword Research — Shetty Marketing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+/* ============================================================
+   Reset & Base
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  background: #f1f5f9;
+  color: #1c1b1b;
+  min-height: 100vh;
+  line-height: 1.5;
+}
+a { color: #1fb1f5; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.app-header {
+  background: linear-gradient(135deg, #1f3a68 0%, #0e1f3a 100%);
+  color: #fff;
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.app-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.app-header .brand .bolt {
+  display: inline-flex;
+  width: 34px; height: 34px;
+  align-items: center; justify-content: center;
+  background: #1fb1f5;
+  border-radius: 8px;
+  font-size: 13px; font-weight: 900;
+  letter-spacing: -0.03em;
+}
+.app-header .brand-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ============================================================
+   Cards
+   ============================================================ */
+.card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 16px;
+}
+
+/* ============================================================
+   Form Fields
+   ============================================================ */
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+.field label small {
+  font-weight: 400;
+  color: #9ca3af;
+}
+.field input[type="text"],
+.field input[type="url"],
+.field select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1c1b1b;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input:focus,
+.field select:focus {
+  border-color: #1fb1f5;
+  box-shadow: 0 0 0 3px rgba(31,177,245,0.12);
+}
+
+.row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 120ms cubic-bezier(0.22,1,0.36,1), box-shadow 120ms;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn-primary {
+  background: #ffdc27;
+  color: #1c1b1b;
+  box-shadow: 0 2px 8px rgba(255,220,39,0.25);
+}
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 16px rgba(255,220,39,0.35);
+}
+.btn-secondary {
+  background: #f1f5f9;
+  color: #374151;
+  border: 1.5px solid #e5e7eb;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+.btn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ============================================================
+   Webhook Row
+   ============================================================ */
+.webhook-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.webhook-row .field { flex: 1; min-width: 200px; margin-bottom: 0; }
+.webhook-row .btn-row { flex-shrink: 0; }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  white-space: nowrap;
+}
+.pill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+.pill.ok { background: #ecfdf5; color: #065f46; }
+.pill.ok .dot { background: #10b981; }
+.pill.fail { background: #fef2f2; color: #991b1b; }
+.pill.fail .dot { background: #ef4444; }
+.pill.loading { background: #eff6ff; color: #1e40af; }
+.pill.loading .dot { background: #3b82f6; animation: pulse 1s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ============================================================
+   Spinner
+   ============================================================ */
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #1fb1f5;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* ============================================================
+   Error
+   ============================================================ */
+.error-box {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 14px 18px;
+  color: #991b1b;
+  font-size: 13px;
+}
+.error-box strong { font-weight: 700; }
+.error-box pre {
+  margin-top: 10px;
+  max-height: 200px;
+  overflow: auto;
+  font-size: 11px;
+  background: #fff;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+}
+
+/* ============================================================
+   Results Table
+   ============================================================ */
+.results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.results-count {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+.results-count span { color: #1fb1f5; }
+.results-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.kw-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.kw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.kw-table thead {
+  background: #f8fafc;
+  border-bottom: 2px solid #e5e7eb;
+}
+.kw-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  white-space: nowrap;
+}
+.kw-table th.num { text-align: right; }
+.kw-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.kw-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.kw-table tbody tr { transition: background 0.1s; }
+.kw-table tbody tr:hover { background: #f8fafc; }
+.kw-table tbody tr.selected { background: #eff6ff; }
+.kw-table tbody tr:last-child td { border-bottom: 0; }
+
+.kw-table .cb-cell { width: 40px; text-align: center; }
+.kw-table input[type="checkbox"] {
+  width: 16px; height: 16px;
+  cursor: pointer;
+  accent-color: #1fb1f5;
+}
+
+/* ============================================================
+   KD Badges
+   ============================================================ */
+.kd-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kd-easy { background: #dcfce7; color: #166534; }
+.kd-medium { background: #fef9c3; color: #854d0e; }
+.kd-hard { background: #fed7aa; color: #9a3412; }
+.kd-super { background: #fecaca; color: #991b1b; }
+.kd-none { background: #f1f5f9; color: #94a3b8; }
+
+/* ============================================================
+   Intent Badges
+   ============================================================ */
+.intent-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.intent-informational { background: #dbeafe; color: #1e40af; }
+.intent-commercial    { background: #f3e8ff; color: #7c3aed; }
+.intent-transactional { background: #dcfce7; color: #166534; }
+.intent-navigational  { background: #ffedd5; color: #c2410c; }
+.intent-question      { background: #fef9c3; color: #854d0e; }
+
+/* ============================================================
+   Weak Spot Badges
+   ============================================================ */
+.weak-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.weak-green { background: #dcfce7; color: #166534; }
+.weak-blue { background: #dbeafe; color: #1e40af; }
+.weak-strong { background: #f1f5f9; color: #64748b; }
+.weak-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.weak-summary .sd-label {
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+.sd-easy { background: #dcfce7; color: #166534; }
+.sd-medium { background: #fef9c3; color: #854d0e; }
+.sd-hard { background: #fecaca; color: #991b1b; }
+
+/* ============================================================
+   Volume formatting
+   ============================================================ */
+.vol-num {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ============================================================
+   Filter Bar & Export Buttons
+   ============================================================ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.filter-chip:hover { background: #f1f5f9; border-color: #cbd5e1; }
+.filter-chip.active { background: #1e293b; color: #fff; border-color: #1e293b; }
+.filter-chip .chip-count {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.filter-sep {
+  width: 1px;
+  height: 24px;
+  background: #e2e8f0;
+  margin: 0 4px;
+}
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.export-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+.export-btn.copied { background: #dcfce7; color: #166534; border-color: #86efac; }
+
+/* ============================================================
+   SERP Results
+   ============================================================ */
+.serp-results {
+  border-top: 2px solid #e5e7eb;
+  padding-top: 20px;
+  margin-top: 4px;
+}
+.serp-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 14px;
+}
+.serp-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.serp-item:last-child { border-bottom: 0; }
+.serp-pos {
+  display: inline-block;
+  width: 28px; height: 28px;
+  line-height: 28px;
+  text-align: center;
+  border-radius: 6px;
+  background: #f1f5f9;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  margin-right: 10px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.serp-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 2px;
+}
+.serp-item-domain {
+  font-size: 12px;
+  color: #059669;
+  font-weight: 500;
+}
+.serp-item-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.serp-features {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.serp-feature-block {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.serp-feature-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+.serp-feature-list {
+  list-style: none;
+  padding: 0;
+}
+.serp-feature-list li {
+  font-size: 13px;
+  color: #374151;
+  padding: 4px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+.serp-feature-list li:last-child { border-bottom: 0; }
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 640px) {
+  .app-header { padding: 16px 20px; }
+  .container { padding: 16px 12px 40px; }
+  .card { padding: 16px; }
+  .row-2 { grid-template-columns: 1fr; }
+  .webhook-row { flex-direction: column; align-items: stretch; }
+  .kw-table th, .kw-table td { padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand"><span class="bolt">SM</span> Keyword Research</div>
+  <div class="brand-sub"><a href="https://shettymarketing.com/SEO%20suite/index.html">&larr; Marketing Suite</a></div>
+</header>
+
+<div class="container">
+
+  <!-- Webhook Config -->
+  <div class="card">
+    <div class="card-title">Webhook Configuration</div>
+    <div class="webhook-row">
+      <div class="field">
+        <label>Keyword Discovery URL <small>(n8n POST /keyword-discover)</small></label>
+        <input type="url" id="kr-discover-url" placeholder="https://your-n8n.example/webhook/keyword-discover" autocomplete="off" />
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary btn-sm" id="kr-save-discover">Save</button>
+        <button class="btn btn-secondary btn-sm" id="kr-test-discover">Test</button>
+        <span class="pill" id="kr-discover-status"><span class="dot"></span> not tested</span>
+      </div>
+    </div>
+    <div class="webhook-row" style="margin-top: 10px;">
+      <div class="field">
+        <label>SERP Analysis URL <small>(n8n POST /keyword-serp)</small></label>
+        <input type="url" id="kr-serp-url" placeholder="https://your-n8n.example/webhook/keyword-serp" autocomplete="off" />
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary btn-sm" id="kr-save-serp">Save</button>
+        <button class="btn btn-secondary btn-sm" id="kr-test-serp">Test</button>
+        <span class="pill" id="kr-serp-status"><span class="dot"></span> not tested</span>
+      </div>
+    </div>
+    <div class="field" style="margin-top: 10px;">
+      <label>DR Threshold <small>(weak spots = DR below this value)</small></label>
+      <input type="number" id="kr-dr-threshold" min="5" max="50" value="20" step="5" />
+    </div>
+  </div>
+
+  <!-- Seed Keyword Input -->
+    <div class="field">
+      <label>Seed Keyword <small>(we expand it into related keywords with volume &amp; KD)</small></label>
+      <input type="text" id="kr-seed" placeholder="e.g. pediatric dentist austin" />
+    </div>
+    <div class="row-2">
+      <div class="field">
+        <label>Location</label>
+        <select id="kr-location"></select>
+      </div>
+      <div class="field">
+        <label>Language</label>
+        <select id="kr-language">
+          <option value="en">English</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+          <option value="de">German</option>
+          <option value="it">Italian</option>
+          <option value="pt">Portuguese</option>
+          <option value="nl">Dutch</option>
+          <option value="hi">Hindi</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Max Keywords <small>(50–3,000)</small></label>
+      <input type="number" id="kr-limit" min="50" max="3000" value="500" step="50" />
+    </div>
+    <div class="btn-row" style="margin-top: 14px;">
+      <button class="btn btn-primary" id="kr-find-btn">Find Keywords</button>
+      <span class="helper" style="font-size:12px;color:#94a3b8;">~5-15s &middot; DataForSEO keyword expansion + KD</span>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="kr-results"></div>
+
+</div>
+
+<script>
+// ============================================================================
+// Keyword Research — standalone frontend
+// ============================================================================
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  // ---- Elements ----
+  const discoverUrl = $('kr-discover-url');
+  const serpUrl = $('kr-serp-url');
+  const drThresholdInput = $('kr-dr-threshold');
+  const seedInput = $('kr-seed');
+  const locationSelect = $('kr-location');
+  const languageSelect = $('kr-language');
+  const limitInput = $('kr-limit');
+  const findBtn = $('kr-find-btn');
+  const resultsBox = $('kr-results');
+
+  const discoverStatus = $('kr-discover-status');
+  const serpStatus = $('kr-serp-status');
+
+  // ---- localStorage Keys ----
+  const K = {
+    discoverUrl: 'kr_discover_url',
+    serpUrl: 'kr_serp_url',
+    seed: 'kr_seed',
+    location: 'kr_location',
+    language: 'kr_language',
+    limit: 'kr_limit',
+    drThreshold: 'kr_dr_threshold'
+  };
+
+  // ---- Populate Location Dropdown ----
+  const COUNTRIES = [
+    'United States','United Kingdom','Canada','Australia','India','Germany','France',
+    'Italy','Spain','Netherlands','Brazil','Mexico','Japan','South Korea','Singapore',
+    'United Arab Emirates','Saudi Arabia','Philippines','Indonesia','Malaysia','Thailand',
+    'Vietnam','South Africa','Nigeria','Argentina','Chile','Colombia','Sweden','Norway',
+    'Denmark','Finland','Switzerland','Belgium','Austria','Ireland','New Zealand','Poland',
+    'Turkey','Israel','Portugal','Greece','Czechia','Hungary','Romania','Pakistan',
+    'Bangladesh','Egypt','Kenya','Russia'
+  ];
+
+  const CITIES = {
+    'United States': [
+      ['New York','New York'],['Los Angeles','California'],['Chicago','Illinois'],
+      ['Houston','Texas'],['Phoenix','Arizona'],['Philadelphia','Pennsylvania'],
+      ['San Antonio','Texas'],['San Diego','California'],['Dallas','Texas'],
+      ['Austin','Texas'],['San Francisco','California'],['Seattle','Washington'],
+      ['Denver','Colorado'],['Boston','Massachusetts'],['Miami','Florida'],
+      ['Atlanta','Georgia'],['Las Vegas','Nevada'],['Portland','Oregon'],
+      ['Washington','District of Columbia'],['Nashville','Tennessee'],
+      ['Detroit','Michigan'],['Minneapolis','Minnesota'],['Charlotte','North Carolina'],
+      ['Indianapolis','Indiana'],['Columbus','Ohio'],['Jacksonville','Florida'],
+      ['San Jose','California'],['Fort Worth','Texas'],['Tampa','Florida'],['Orlando','Florida']
+    ],
+    'Canada': [
+      ['Toronto','Ontario'],['Vancouver','British Columbia'],['Montreal','Quebec'],
+      ['Calgary','Alberta'],['Edmonton','Alberta'],['Ottawa','Ontario']
+    ],
+    'United Kingdom': [
+      ['London'],['Birmingham'],['Manchester'],['Leeds'],['Glasgow'],['Liverpool'],
+      ['Edinburgh'],['Bristol'],['Sheffield']
+    ],
+    'Australia': [
+      ['Sydney','New South Wales'],['Melbourne','Victoria'],['Brisbane','Queensland'],
+      ['Perth','Western Australia'],['Adelaide','South Australia']
+    ],
+    'India': [
+      ['Mumbai','Maharashtra'],['Delhi'],['Bangalore','Karnataka'],
+      ['Hyderabad','Telangana'],['Chennai','Tamil Nadu'],['Kolkata','West Bengal'],
+      ['Ahmedabad','Gujarat'],['Pune','Maharashtra'],['Jaipur','Rajasthan']
+    ],
+    'Germany': [['Berlin'],['Munich'],['Hamburg'],['Frankfurt'],['Cologne'],['Stuttgart']],
+    'France': [['Paris'],['Marseille'],['Lyon'],['Toulouse'],['Nice'],['Nantes']],
+    'Spain': [['Madrid'],['Barcelona'],['Valencia'],['Seville'],['Zaragoza']],
+    'Italy': [['Rome'],['Milan'],['Naples'],['Turin'],['Palermo'],['Florence']],
+    'Netherlands': [['Amsterdam'],['Rotterdam'],['The Hague'],['Utrecht'],['Eindhoven']],
+    'Brazil': [['São Paulo'],['Rio de Janeiro'],['Brasília'],['Salvador']],
+    'Mexico': [['Mexico City'],['Guadalajara'],['Monterrey'],['Puebla']],
+    'Japan': [['Tokyo'],['Osaka'],['Yokohama'],['Nagoya'],['Sapporo']],
+    'United Arab Emirates': [['Dubai'],['Abu Dhabi'],['Sharjah']],
+    'Singapore': [['Singapore']]
+  };
+
+  function populateLocations() {
+    const frag = document.createDocumentFragment();
+
+    const globalOpt = document.createElement('option');
+    globalOpt.value = '';
+    globalOpt.textContent = '🌍 Global (no location filter)';
+    frag.appendChild(globalOpt);
+
+    const countryGroup = document.createElement('optgroup');
+    countryGroup.label = 'Countries';
+    for (const country of COUNTRIES) {
+      const opt = document.createElement('option');
+      opt.value = country;
+      opt.textContent = country;
+      countryGroup.appendChild(opt);
+    }
+    frag.appendChild(countryGroup);
+
+    for (const country of Object.keys(CITIES)) {
+      const group = document.createElement('optgroup');
+      group.label = country + ' — Cities';
+      for (const parts of CITIES[country]) {
+        const opt = document.createElement('option');
+        opt.value = [...parts, country].join(',');
+        opt.textContent = parts.length === 1 ? parts[0] : (parts[0] + ', ' + parts[1]);
+        group.appendChild(opt);
+      }
+      frag.appendChild(group);
+    }
+
+    locationSelect.appendChild(frag);
+  }
+  populateLocations();
+
+  // ---- Restore from localStorage ----
+  function restore(el, key) {
+    const v = localStorage.getItem(key);
+    if (v !== null && v !== '') el.value = v;
+    el.addEventListener('input', () => localStorage.setItem(key, el.value));
+    el.addEventListener('change', () => localStorage.setItem(key, el.value));
+  }
+  restore(discoverUrl, K.discoverUrl);
+  restore(serpUrl, K.serpUrl);
+  restore(seedInput, K.seed);
+  restore(locationSelect, K.location);
+  restore(languageSelect, K.language);
+  restore(limitInput, K.limit);
+  restore(drThresholdInput, K.drThreshold);
+
+  // ---- Helpers ----
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+    );
+  }
+
+  function setStatus(pill, state, label) {
+    pill.className = 'pill ' + (state === 'ok' ? 'ok' : state === 'fail' ? 'fail' : state === 'loading' ? 'loading' : '');
+    pill.innerHTML = '<span class="dot"></span> ' + escapeHtml(label);
+  }
+
+  function validUrl(u) { try { new URL(u); return true; } catch { return false; } }
+
+  function formatVolume(v) {
+    if (v == null) return '—';
+    if (v >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (v >= 1000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(v);
+  }
+
+  function kdBand(kd) {
+    if (kd == null) return { cls: 'kd-none', label: '—' };
+    if (kd < 30) return { cls: 'kd-easy', label: String(kd) };
+    if (kd < 50) return { cls: 'kd-medium', label: String(kd) };
+    if (kd < 70) return { cls: 'kd-hard', label: String(kd) };
+    return { cls: 'kd-super', label: String(kd) };
+  }
+
+  // ---- Test Webhooks ----
+  $('kr-test-discover').addEventListener('click', async () => {
+    const url = discoverUrl.value.trim();
+    if (!url) { setStatus(discoverStatus, 'fail', 'enter URL'); return; }
+    if (!validUrl(url)) { setStatus(discoverStatus, 'fail', 'invalid URL'); return; }
+    setStatus(discoverStatus, 'loading', 'testing...');
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true })
+      });
+      setStatus(discoverStatus, res.ok ? 'ok' : 'fail', res.ok ? 'reachable' : 'HTTP ' + res.status);
+    } catch (e) {
+      setStatus(discoverStatus, 'fail', e.message || 'unreachable');
+    }
+  });
+
+  $('kr-test-serp').addEventListener('click', async () => {
+    const url = serpUrl.value.trim();
+    if (!url) { setStatus(serpStatus, 'fail', 'enter URL'); return; }
+    if (!validUrl(url)) { setStatus(serpStatus, 'fail', 'invalid URL'); return; }
+    setStatus(serpStatus, 'loading', 'testing...');
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test: true })
+      });
+      setStatus(serpStatus, res.ok ? 'ok' : 'fail', res.ok ? 'reachable' : 'HTTP ' + res.status);
+    } catch (e) {
+      setStatus(serpStatus, 'fail', e.message || 'unreachable');
+    }
+  });
+
+  // ---- Save Webhook URLs ----
+  $('kr-save-discover').addEventListener('click', () => {
+    localStorage.setItem(K.discoverUrl, discoverUrl.value.trim());
+    const btn = $('kr-save-discover');
+    btn.textContent = 'Saved ✓';
+    setTimeout(() => btn.textContent = 'Save', 1200);
+  });
+  $('kr-save-serp').addEventListener('click', () => {
+    localStorage.setItem(K.serpUrl, serpUrl.value.trim());
+    const btn = $('kr-save-serp');
+    btn.textContent = 'Saved ✓';
+    setTimeout(() => btn.textContent = 'Save', 1200);
+  });
+
+  // ---- Selected keywords tracking ----
+  let selectedKeywords = new Set();
+
+  // ---- Find Keywords ----
+  findBtn.addEventListener('click', async () => {
+    try {
+      const url = discoverUrl.value.trim();
+      if (!url) throw new Error('Enter the Keyword Discovery webhook URL first.');
+      if (!validUrl(url)) throw new Error('Keyword Discovery URL is not valid.');
+
+      const seed = seedInput.value.trim();
+      if (!seed) throw new Error('Seed Keyword is required.');
+
+      const location = locationSelect.value;
+      const language = languageSelect.value;
+      const limit = Math.max(50, Math.min(3000, parseInt(limitInput.value, 10) || 500));
+
+      findBtn.disabled = true;
+      selectedKeywords.clear();
+      resultsBox.innerHTML = '<div class="card loading-card"><div class="spinner"></div><div>Expanding "' + escapeHtml(seed) + '" into ' + limit + ' related keywords...</div></div>';
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seed_keyword: seed,
+          location: location || undefined,
+          language,
+          limit,
+          requested_at: new Date().toISOString()
+        })
+      });
+
+      const raw = await res.text();
+      let payload;
+      try { payload = JSON.parse(raw); }
+      catch { throw new Error('Webhook did not return JSON (HTTP ' + res.status + '). ' + raw.slice(0, 300)); }
+
+      if (!res.ok) throw new Error(payload.error || 'HTTP ' + res.status);
+      if (payload.error) throw new Error(payload.error);
+
+      renderKeywords(payload);
+    } catch (e) {
+      resultsBox.innerHTML = '<div class="error-box"><strong>Error:</strong> ' + escapeHtml(e.message) + (e.detail ? '<pre>' + escapeHtml(e.detail) + '</pre>' : '') + '</div>';
+    } finally {
+      findBtn.disabled = false;
+    }
+  });
+
+  // ---- Render Keywords Table ----
+  let allKeywords = [];
+  let activeFilter = 'all';
+
+  function renderKeywords(payload) {
+    allKeywords = Array.isArray(payload.keywords) ? payload.keywords : [];
+    const req = payload.request || {};
+
+    if (!allKeywords.length) {
+      resultsBox.innerHTML = '<div class="error-box"><strong>No keywords found.</strong> Try a different seed keyword or location.</div>';
+      return;
+    }
+
+    activeFilter = 'all';
+    let html = '<div class="card">';
+    html += '<div class="results-head">';
+    html += '<div class="results-count"><span>' + allKeywords.length + '</span> keywords found for "' + escapeHtml(req.seed_keyword || '') + '" in ' + escapeHtml(req.location || 'Global') + '</div>';
+    html += '<div class="results-actions">';
+    html += '<span style="font-size:12px;color:#94a3b8;" id="kr-selected-count">Selected: 0</span>';
+    html += '<button class="btn btn-primary btn-sm" id="kr-analyze-btn" disabled>Analyze SERP</button>';
+    html += '</div>';
+    html += '</div>';
+
+    // Filter bar + export
+    html += renderFilterBar(allKeywords);
+    html += renderTable(allKeywords);
+
+    // SERP results container
+    html += '<div id="kr-serp-container"></div>';
+
+    html += '</div>';
+    resultsBox.innerHTML = html;
+
+    // Wire up filter chips
+    const chips = resultsBox.querySelectorAll('.filter-chip');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        activeFilter = chip.dataset.intent;
+        chips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        const tableWrap = resultsBox.querySelector('.kw-table-wrap');
+        if (tableWrap) {
+          tableWrap.outerHTML = renderTable(allKeywords);
+        }
+        wireCheckboxes();
+      });
+    });
+
+    // Wire up export buttons
+    wireExportButtons();
+
+    // Wire up checkboxes
+    wireCheckboxes();
+  }
+
+  function getFilteredKeywords() {
+    if (activeFilter === 'all') return allKeywords;
+    return allKeywords.filter(kw => (kw.intent || 'informational') === activeFilter);
+  }
+
+  function renderFilterBar(keywords) {
+    const counts = { all: keywords.length };
+    const intents = ['question', 'informational', 'commercial', 'transactional', 'navigational'];
+    intents.forEach(i => counts[i] = 0);
+    keywords.forEach(kw => {
+      const intent = kw.intent || 'informational';
+      if (counts[intent] !== undefined) counts[intent]++;
+      else counts[intent] = 1;
+    });
+
+    let html = '<div class="filter-bar">';
+    html += '<button class="filter-chip active" data-intent="all">All <span class="chip-count">(' + counts.all + ')</span></button>';
+    for (const i of intents) {
+      if (counts[i] > 0) {
+        html += '<button class="filter-chip" data-intent="' + i + '">' + i.charAt(0).toUpperCase() + i.slice(1) + ' <span class="chip-count">(' + counts[i] + ')</span></button>';
+      }
+    }
+    html += '<div class="filter-sep"></div>';
+    html += '<button class="export-btn" id="kr-copy" title="Copy to clipboard">Copy</button>';
+    html += '<button class="export-btn" id="kr-csv" title="Download CSV">CSV</button>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderTable(keywords) {
+    const filtered = activeFilter === 'all' ? keywords : keywords.filter(kw => (kw.intent || 'informational') === activeFilter);
+    let html = '<div class="kw-table-wrap">';
+    html += '<table class="kw-table">';
+    html += '<thead><tr>';
+    html += '<th class="cb-cell"><input type="checkbox" id="kr-select-all" /></th>';
+    html += '<th>Keyword</th>';
+    html += '<th>Intent</th>';
+    html += '<th class="num">Volume</th>';
+    html += '<th class="num">KD</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
+
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
+      const band = kdBand(kw.kd);
+      const matchFilter = activeFilter === 'all' || (kw.intent || 'informational') === activeFilter;
+      html += '<tr data-idx="' + i + '"' + (matchFilter ? '' : ' style="display:none"') + '>';
+      html += '<td class="cb-cell"><input type="checkbox" class="kr-cb" data-idx="' + i + '" /></td>';
+      html += '<td>' + escapeHtml(kw.keyword) + '</td>';
+      html += '<td><span class="intent-badge intent-' + (kw.intent || 'informational') + '">' + escapeHtml(kw.intent || 'informational') + '</span></td>';
+      html += '<td class="num"><span class="vol-num">' + formatVolume(kw.search_volume) + '</span></td>';
+      html += '<td class="num"><span class="kd-badge ' + band.cls + '">' + band.label + '</span></td>';
+      html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    html += '</div>';
+    return html;
+  }
+
+  function wireCheckboxes() {
+    const selectAll = $('kr-select-all');
+    const cbs = resultsBox.querySelectorAll('.kr-cb');
+    const selectedCountEl = $('kr-selected-count');
+    const analyzeBtn = $('kr-analyze-btn');
+
+    function updateSelection() {
+      selectedKeywords.clear();
+      cbs.forEach(cb => {
+        if (cb.checked) {
+          const idx = parseInt(cb.dataset.idx, 10);
+          selectedKeywords.add(idx);
+          cb.closest('tr').classList.add('selected');
+        } else {
+          cb.closest('tr').classList.remove('selected');
+        }
+      });
+      selectedCountEl.textContent = 'Selected: ' + selectedKeywords.size;
+      analyzeBtn.disabled = selectedKeywords.size === 0;
+      analyzeBtn.textContent = selectedKeywords.size > 0 ? 'Analyze SERP (' + selectedKeywords.size + ')' : 'Analyze SERP';
+      selectAll.checked = cbs.length > 0 && [...cbs].every(cb => cb.checked);
+      selectAll.indeterminate = cbs.length > 0 && [...cbs].some(cb => cb.checked) && !selectAll.checked;
+    }
+
+    selectAll.addEventListener('change', () => {
+      cbs.forEach(cb => cb.checked = selectAll.checked);
+      updateSelection();
+    });
+    cbs.forEach(cb => cb.addEventListener('change', updateSelection));
+
+    // Analyze SERP button
+    analyzeBtn.addEventListener('click', async () => {
+      if (selectedKeywords.size === 0) return;
+      const selectedKws = [...selectedKeywords].map(idx => allKeywords[idx].keyword);
+      await analyzeAllSerp(selectedKws);
+    });
+  }
+
+  function wireExportButtons() {
+    const copyBtn = $('kr-copy');
+    const csvBtn = $('kr-csv');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const filtered = getFilteredKeywords();
+        const header = 'Keyword\tIntent\tVolume\tKD';
+        const rows = filtered.map(kw => kw.keyword + '\t' + (kw.intent || 'informational') + '\t' + (kw.search_volume || 0) + '\t' + (kw.kd != null ? kw.kd : ''));
+        const tsv = [header, ...rows].join('\n');
+        navigator.clipboard.writeText(tsv).then(() => {
+          copyBtn.textContent = 'Copied!';
+          copyBtn.classList.add('copied');
+          setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 2000);
+        });
+      });
+    }
+    if (csvBtn) {
+      csvBtn.addEventListener('click', () => {
+        const filtered = getFilteredKeywords();
+        const header = 'Keyword,Intent,Volume,KD';
+        const rows = filtered.map(kw => '"' + (kw.keyword || '').replace(/"/g, '""') + '",' + (kw.intent || 'informational') + ',' + (kw.search_volume || 0) + ',' + (kw.kd != null ? kw.kd : ''));
+        const csv = [header, ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'keywords-' + (allKeywords[0]?.keyword || 'export').replace(/[^a-z0-9]/gi, '-') + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+  }
+
+  // ---- Fetch SERP for a single keyword ----
+  async function fetchSerp(keyword) {
+    const url = serpUrl.value.trim();
+    const location = locationSelect.value;
+    const language = languageSelect.value;
+    const drThreshold = Math.max(5, Math.min(50, parseInt(drThresholdInput.value, 10) || 20));
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keyword,
+        location: location || undefined,
+        language,
+        depth: 10,
+        dr_threshold: drThreshold,
+        requested_at: new Date().toISOString()
+      })
+    });
+
+    const raw = await res.text();
+    let payload;
+    try { payload = JSON.parse(raw); }
+    catch { throw new Error('Webhook did not return JSON (HTTP ' + res.status + ')'); }
+
+    if (!res.ok) throw new Error(payload.error || 'HTTP ' + res.status);
+    if (payload.error) throw new Error(payload.error);
+
+    return { keyword, payload };
+  }
+
+  // ---- Analyze SERP for all selected keywords ----
+  async function analyzeAllSerp(selectedKws) {
+    const url = serpUrl.value.trim();
+    if (!url) { alert('Enter the SERP Analysis webhook URL first.'); return; }
+    if (!validUrl(url)) { alert('SERP Analysis URL is not valid.'); return; }
+
+    const container = $('kr-serp-container');
+    if (!container) return;
+
+    container.innerHTML = '<div class="serp-results"><div class="loading-card"><div class="spinner"></div><div>Analyzing SERP for ' + selectedKws.length + ' keyword' + (selectedKws.length !== 1 ? 's' : '') + '...</div></div></div>';
+
+    try {
+      const results = await Promise.all(selectedKws.map(kw => fetchSerp(kw)));
+      renderAllWeakSpots(container, results);
+    } catch (e) {
+      container.innerHTML = '<div class="serp-results"><div class="error-box"><strong>SERP Error:</strong> ' + escapeHtml(e.message) + '</div></div>';
+    }
+  }
+
+  // ---- Render Weak Spots for all keywords ----
+  function renderAllWeakSpots(container, serpResults) {
+    let html = '<div class="serp-results">';
+    let totalWeak = 0;
+    let totalKeywords = 0;
+
+    // First pass: collect all weak spots per keyword
+    const keywordWeakSpots = [];
+    for (const { keyword, payload } of serpResults) {
+      const results = Array.isArray(payload.results) ? payload.results : [];
+      const ws = payload.weak_spot_summary || {};
+      const weakSpots = results.filter(r => r.weak_spot_type);
+      if (weakSpots.length > 0) {
+        keywordWeakSpots.push({ keyword, weakSpots, ws });
+        totalWeak += weakSpots.length;
+        totalKeywords++;
+      }
+    }
+
+    // Summary header
+    html += '<div class="serp-title">' + totalWeak + ' Weak Spot' + (totalWeak !== 1 ? 's' : '') + ' Found Across ' + totalKeywords + ' Keyword' + (totalKeywords !== 1 ? 's' : '') + '</div>';
+
+    if (totalWeak === 0) {
+      html += '<div style="padding:16px;color:#64748b;font-size:13px;">No weak spots found in any of the selected keywords. All results have DR ≥ 20.</div>';
+    }
+
+    // Per-keyword sections
+    for (const { keyword, weakSpots, ws } of keywordWeakSpots) {
+      const sd = ws.serp_difficulty || 3;
+      const sdLabel = sd === 1 ? 'Easy' : sd === 2 ? 'Medium' : 'Hard';
+      const sdCls = sd === 1 ? 'sd-easy' : sd === 2 ? 'sd-medium' : 'sd-hard';
+
+      html += '<div style="margin-top:16px;padding-bottom:8px;border-bottom:1px solid #e5e7eb;">';
+      html += '<div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:6px;">"' + escapeHtml(keyword) + '" — <span class="sd-label ' + sdCls + '" style="font-size:11px;">SD ' + sd + ' ' + sdLabel + '</span> <span style="font-weight:400;color:#64748b;">(' + weakSpots.length + ' weak spot' + (weakSpots.length !== 1 ? 's' : '') + ')</span></div>';
+
+      for (const r of weakSpots) {
+        html += '<div style="display:flex;align-items:baseline;gap:8px;padding:6px 0;font-size:13px;">';
+        html += '<span style="color:#94a3b8;font-variant-numeric:tabular-nums;min-width:24px;text-align:right;">' + (r.position || '—') + '</span>';
+        html += '<span style="font-weight:600;color:#1e293b;">' + escapeHtml(r.domain || '') + '</span>';
+        if (r.weak_spot_type === 'green_fruit') {
+          html += '<span class="weak-badge weak-green">DR ' + (r.dr != null ? r.dr : '?') + ' — Weak</span>';
+        } else if (r.weak_spot_type === 'blue_fruit') {
+          html += '<span class="weak-badge weak-blue">UGC</span>';
+        }
+        html += '<span style="color:#64748b;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px;">' + escapeHtml(r.title || '') + '</span>';
+        html += '</div>';
+      }
+
+      html += '</div>';
+    }
+
+    html += '</div>';
+    container.innerHTML = html;
+    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+})();
+</script>
+</body>
+</html>

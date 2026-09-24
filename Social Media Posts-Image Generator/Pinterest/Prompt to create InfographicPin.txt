@@ -1,0 +1,64 @@
+﻿Format: Portrait (2:3 ratio), Pinterest-optimized
+Content Source: Use information and images from the referenced blog post.
+Color Scheme:{F:\Opencode Projects\Social Media Posts-Image Generator\Pinterest\Thin Hair Growth Guide Brand Colors.txt}
+
+Audience: Male
+- Tone: Direct, bold, no fluff
+- Visual: Sharp geometry, strong contrast
+- Colors: Cool/neutral tones
+- Messaging: Empowering, solution-focused
+
+Style & Aesthetic:
+
+    Clean, modern, medical-trust look
+    Clear typography hierarchy for easy scanning
+    Minimal line icons (no photos)
+    All text must be highly legible and error-free
+
+## Kie.ai API Configuration
+
+Endpoint: POST https://api.kie.ai/api/v1/jobs/createTask
+Authorization: Bearer <API_KEY>
+Content-Type: application/json
+
+Model: gpt-image-2-image-to-image
+
+Request Format (parameters go inside 'input' object):
+{
+  "model": "gpt-image-2-image-to-image",
+  "callBackUrl": "https://webhook.site/...",
+  "input": {
+    "prompt": "<your prompt here>",
+    "input_urls": ["<hero image URL>"],
+    "aspect_ratio": "2:3",
+    "resolution": "2K"
+  }
+}
+
+Polling (check task status):
+GET https://api.kie.ai/api/v1/jobs/recordInfo?taskId={taskId}
+
+Response format:
+{
+  "code": 200,
+  "msg": "success",
+  "data": {
+    "state": "success",
+    "resultJson": "{\"resultUrls\":[\"https://...\"]}"
+  }
+}
+
+References:
+
+    Refer to the { Add link to blog post} for text/information
+    Use blog images for visual reference only
+    ## Logo Requirement (STRICT)
+
+Use ONLY the official Thin Hair Growth Guide logo. Do NOT generate or invent a logo.
+
+Logo files:
+- Light backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide logo.png
+- Dark backgrounds: F:\Opencode Projects\Hair Restoration\Media\Thin Hair Growth Guide ( White logo).png
+
+Placement: Bottom-right corner, approximately 8-10% of image width.
+Maintain clear padding from edges.

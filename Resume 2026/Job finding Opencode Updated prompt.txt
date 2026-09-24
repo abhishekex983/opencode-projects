@@ -1,0 +1,104 @@
+Please use Playwright to open Indeed, LinkedIn, and https://www.eluta.ca (job listing platforms). I will log in to these platforms to help you access job postings.
+
+## Search Parameters
+
+**Date Range:** Last 3 days
+**Page Limit:** Collect ALL available listings (no limit)
+**Deduplication:** Keep duplicates across platforms (same job on multiple platforms is fine)
+**Experience Level:** Include all levels, even senior roles requiring more experience
+
+### Priority 1: SEO-Related Roles
+Search for jobs with these titles:
+- SEO Specialist
+- SEO Coordinator
+- SEO Strategist
+- Organic Growth Specialist
+- Content Optimization Specialist
+
+Include roles like Digital Marketing Coordinator or Marketing Specialist if the responsibilities or requirements mention a strong focus on SEO or organic search, even if the title does not.
+
+### Priority 2: Digital Marketing Roles
+Search for these titles:
+- Digital Marketing Specialist
+- Digital Marketing Coordinator
+- SEO Specialist
+- SEO Coordinator
+
+## My Profile
+
+### Core Skills:
+- SEO (90%)
+- WordPress Management (80%)
+- Email Marketing (70%)
+- Content Creation (70%)
+- Graphic Designing (70%)
+
+### Technical Stack:
+- **SEO Tools:** Ahrefs, Surfer SEO, DataforSEO, Google Search Console, Google Analytics
+- **CMS:** WordPress, Elementor
+- **Web Development:** HTML, CSS, PHP, JavaScript
+- **Email Marketing:** ActiveCampaign
+- **Design:** Adobe Creative Cloud, Canva
+- **AI/Automation:** Claude Code, n8n, Gemini
+
+### Industry Experience:
+- **Current:** Education/Certification (Coast2Coast First Aid and Aquatics) - SEO Specialist & Marketing Coordinator (March 2026 – Present)
+- **Previous:** B2B Technology (InnoVyne Tech) - Digital Marketing Specialist (Jun 2021 – Oct 2025)
+
+### Key Achievements:
+- Increased company revenue by 30% through SEO strategies
+- Increased website traffic by 200% over six months
+- Built AI-powered on-page and off-page SEO tools
+- Developed lead scoring systems for sales teams
+
+### Portfolio: https://shettymarketing.com/
+
+## Location Preferences:
+- Focus on remote and hybrid positions in Toronto
+- Also include remote jobs available across Canada
+
+## Relevancy Scoring (1-10):
+
+| Criteria | Points | Description |
+|----------|--------|-------------|
+| **Role Fit** | 0-4 | Exact SEO title (4), Synonym (3), Marketing+SEO focus (2), General marketing (1) |
+| **Industry Alignment** | 0-2 | Education/Certification (+1), B2B (+1) |
+| **Technical Skills** | 0-2 | Core: SEO, WordPress, HTML/CSS/PHP/JS (+1), Ancillary: Email, Design (+1) |
+| **Location Match** | 0-2 | Remote/Hybrid Toronto (2), Remote Canada (1), On-site Toronto (1) |
+
+## Output Requirements:
+
+1. **Display:** Markdown table sorted by relevancy score (highest first)
+2. **Save to Files:**
+   - `job_search_results.md` — Formatted table with clickable links
+   - `job_search_results.csv` — Spreadsheet-compatible for filtering/sorting
+
+### Table Columns:
+| # | Job Title | Company | Location | Platform | Date Posted | Relevancy Score | Work Type | Link |
+
+### Work Type Detection:
+For each job, determine work type (Remote/Hybrid/In-person) by clicking into each job detail page:
+1. **Indeed:** Check job description for "Work Location: In person", "Work Location: Remote", "Hybrid work arrangement", and job address tags
+2. **LinkedIn:** Extract from job tags (Remote/Hybrid/On-site) and job description
+3. **Eluta.ca:** Check job description for keywords like "remote", "hybrid", "in person", "work from home"
+4. If not specified in visible description, mark as "Not specified"
+
+### Process:
+1. Launch Playwright browser with 3 tabs (Indeed.ca, LinkedIn, Eluta.ca)
+2. **Pause for manual login** on each platform before scraping
+3. For each platform, execute each search query with filters (Last 3 days, Toronto/Remote)
+4. Scrape ALL pages of results
+5. For each job, click into detail page to extract work type from description
+6. Apply rate limiting: 2-3 second delay between requests
+7. Score each job using the relevancy criteria
+8. Sort by relevancy score (descending)
+9. Generate output table and save to files
+
+### Rate Limiting:
+- 2-3 second delay between job detail page visits
+- If CAPTCHA or block detected: pause and notify user
+- If rate limit hit: wait 30-60 seconds before retry
+
+### Estimated Time:
+- 7 queries × 3 platforms = 21 search operations
+- Pagination + detail pages: ~30-45 minutes total

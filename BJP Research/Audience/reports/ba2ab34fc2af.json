@@ -1,0 +1,571 @@
+{
+  "total_monthly_volume": 239160,
+  "unique_audience": 155454,
+  "tam": 217635,
+  "demographic_segments": [
+    {
+      "age_group": "18-24",
+      "gender": "male",
+      "audience_size": 19743
+    },
+    {
+      "age_group": "18-24",
+      "gender": "female",
+      "audience_size": 25959
+    },
+    {
+      "age_group": "25-34",
+      "gender": "male",
+      "audience_size": 21557
+    },
+    {
+      "age_group": "25-34",
+      "gender": "female",
+      "audience_size": 28343
+    },
+    {
+      "age_group": "35-44",
+      "gender": "male",
+      "audience_size": 19005
+    },
+    {
+      "age_group": "35-44",
+      "gender": "female",
+      "audience_size": 24988
+    },
+    {
+      "age_group": "45-54",
+      "gender": "male",
+      "audience_size": 4096
+    },
+    {
+      "age_group": "45-54",
+      "gender": "female",
+      "audience_size": 5386
+    },
+    {
+      "age_group": "55-64",
+      "gender": "male",
+      "audience_size": 2753
+    },
+    {
+      "age_group": "55-64",
+      "gender": "female",
+      "audience_size": 3620
+    }
+  ],
+  "geo_segments": [
+    {
+      "region": "Ontario",
+      "audience_size": 34157,
+      "interest": 450
+    },
+    {
+      "region": "Saskatchewan",
+      "audience_size": 25276,
+      "interest": 333
+    },
+    {
+      "region": "Manitoba",
+      "audience_size": 14422,
+      "interest": 190
+    },
+    {
+      "region": "Newfoundland and Labrador",
+      "audience_size": 14422,
+      "interest": 190
+    },
+    {
+      "region": "Alberta",
+      "audience_size": 14346,
+      "interest": 189
+    },
+    {
+      "region": "Nova Scotia",
+      "audience_size": 11613,
+      "interest": 153
+    },
+    {
+      "region": "British Columbia",
+      "audience_size": 10702,
+      "interest": 141
+    },
+    {
+      "region": "New Brunswick",
+      "audience_size": 9791,
+      "interest": 129
+    },
+    {
+      "region": "Prince Edward Island",
+      "audience_size": 7666,
+      "interest": 101
+    },
+    {
+      "region": "Yukon",
+      "audience_size": 7590,
+      "interest": 100
+    }
+  ],
+  "intent_segments": {
+    "informational": {
+      "volume": 167800,
+      "pct": 70.2
+    },
+    "commercial": {
+      "volume": 65700,
+      "pct": 27.5
+    },
+    "transactional": {
+      "volume": 5050,
+      "pct": 2.1
+    },
+    "navigational": {
+      "volume": 610,
+      "pct": 0.3
+    }
+  },
+  "top_keywords": [
+    {
+      "keyword": "cpr",
+      "search_volume": 27100,
+      "cpc": 2.51,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "stable"
+    },
+    {
+      "keyword": "cpr certification",
+      "search_volume": 9900,
+      "cpc": 1.97,
+      "competition": "HIGH",
+      "intent": "informational",
+      "trend": "stable"
+    },
+    {
+      "keyword": "cpr and first aid training",
+      "search_volume": 9900,
+      "cpc": 2.46,
+      "competition": "HIGH",
+      "intent": "informational",
+      "trend": "stable"
+    },
+    {
+      "keyword": "first aid and cpr course",
+      "search_volume": 9900,
+      "cpc": 2.46,
+      "competition": "HIGH",
+      "intent": "informational",
+      "trend": "stable"
+    },
+    {
+      "keyword": "first aid cpr course",
+      "search_volume": 9900,
+      "cpc": 2.46,
+      "competition": "HIGH",
+      "intent": "informational",
+      "trend": "stable"
+    },
+    {
+      "keyword": "basic life support certification",
+      "search_volume": 6600,
+      "cpc": 2.08,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "bls certification",
+      "search_volume": 6600,
+      "cpc": 2.08,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "st john ambulance first aid",
+      "search_volume": 6600,
+      "cpc": 0.8,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "bcls certification",
+      "search_volume": 6600,
+      "cpc": 2.08,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "st john ambulance first aid course",
+      "search_volume": 6600,
+      "cpc": 0.8,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "st john ambulance first aid training",
+      "search_volume": 6600,
+      "cpc": 0.8,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aider training",
+      "search_volume": 4400,
+      "cpc": 2.41,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aid courses",
+      "search_volume": 4400,
+      "cpc": 1.78,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "1st aid courses",
+      "search_volume": 4400,
+      "cpc": 1.78,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr training",
+      "search_volume": 3600,
+      "cpc": 2.13,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr first aid certification",
+      "search_volume": 3600,
+      "cpc": 2.15,
+      "competition": "HIGH",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "red cross first aid",
+      "search_volume": 2400,
+      "cpc": 2,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr classes near me",
+      "search_volume": 2400,
+      "cpc": 2.03,
+      "competition": "HIGH",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr certification near me",
+      "search_volume": 2400,
+      "cpc": 2.03,
+      "competition": "HIGH",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "mental health first aid",
+      "search_volume": 2400,
+      "cpc": 2.16,
+      "competition": "LOW",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr course near me",
+      "search_volume": 2400,
+      "cpc": 2.03,
+      "competition": "HIGH",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "bls near me",
+      "search_volume": 2400,
+      "cpc": 2.29,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr certification classes near me",
+      "search_volume": 2400,
+      "cpc": 2.03,
+      "competition": "HIGH",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "standard first aid with cpr c",
+      "search_volume": 1900,
+      "cpc": 2.88,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "st johns first aid",
+      "search_volume": 1900,
+      "cpc": 0.72,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "st johns first aid course",
+      "search_volume": 1900,
+      "cpc": 0.84,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "red cross first aid course",
+      "search_volume": 1900,
+      "cpc": 2.11,
+      "competition": "LOW",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "standard first aid and cpr c",
+      "search_volume": 1900,
+      "cpc": 2.88,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr level c",
+      "search_volume": 1900,
+      "cpc": 2.34,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "standard first aid and cpr level c",
+      "search_volume": 1900,
+      "cpc": 2.53,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "red cross first aid certification",
+      "search_volume": 1600,
+      "cpc": 1.73,
+      "competition": "LOW",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aid classes near me",
+      "search_volume": 1600,
+      "cpc": 1.85,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aid and cpr course near me",
+      "search_volume": 1600,
+      "cpc": 2.43,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr near me",
+      "search_volume": 1600,
+      "cpc": 2.06,
+      "competition": "LOW",
+      "intent": "transactional",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr and first aid classes near me",
+      "search_volume": 1600,
+      "cpc": 2.43,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aid cpr training near me",
+      "search_volume": 1600,
+      "cpc": 2.43,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aid and cpr training near me",
+      "search_volume": 1600,
+      "cpc": 2.43,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr and first aid certification near me",
+      "search_volume": 1600,
+      "cpc": 2.43,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aid course near me",
+      "search_volume": 1600,
+      "cpc": 1.85,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "first aid course vancouver",
+      "search_volume": 1300,
+      "cpc": 3.17,
+      "competition": "HIGH",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "bls training",
+      "search_volume": 1300,
+      "cpc": 2.13,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "red cross first aid training",
+      "search_volume": 1300,
+      "cpc": 2.39,
+      "competition": "LOW",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "bls course",
+      "search_volume": 1300,
+      "cpc": 2.13,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "american red cross first aid training",
+      "search_volume": 1300,
+      "cpc": 2.39,
+      "competition": "LOW",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr course",
+      "search_volume": 1300,
+      "cpc": 2.01,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "cpr and first aid certification",
+      "search_volume": 1300,
+      "cpc": 2.28,
+      "competition": "HIGH",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "infant cpr",
+      "search_volume": 1300,
+      "cpc": 0.87,
+      "competition": "LOW",
+      "intent": "informational",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "bls cpr certification",
+      "search_volume": 1000,
+      "cpc": 2.21,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "red cross cpr and first aid",
+      "search_volume": 1000,
+      "cpc": 2.49,
+      "competition": "MEDIUM",
+      "intent": "commercial",
+      "trend": "unknown"
+    },
+    {
+      "keyword": "red cross cpr",
+      "search_volume": 1000,
+      "cpc": 1.95,
+      "competition": "MEDIUM",
+      "intent": "informational",
+      "trend": "unknown"
+    }
+  ],
+  "commercial_market": {
+    "audience_size": 42749,
+    "avg_cpc": 2.67
+  },
+  "trend_summary": {
+    "growing": 0,
+    "stable": 5,
+    "declining": 0
+  },
+  "competition_level": "LOW",
+  "avg_cpc": 2.67,
+  "report_id": "ba2ab34fc2af",
+  "description": "Canadians looking for first aid certification courses, CPR training, and workplace safety training",
+  "location_name": "Canada",
+  "language_code": "en",
+  "seed_keywords": [
+    "first aid certification canada",
+    "cpr training near me",
+    "workplace safety training ontario",
+    "st john ambulance courses",
+    "red cross first aid certification",
+    "online cpr certification canada",
+    "first aid recertification course",
+    "emergency first aid course",
+    "standard first aid with cpr c",
+    "affordable first aid training",
+    "workplace safety training requirements",
+    "first aid course vancouver",
+    "cpr level a training",
+    "basic life support certification",
+    "first aid for children course",
+    "mental health first aid training",
+    "alberta first aid certification requirements",
+    "online workplace safety courses canada",
+    "find a cpr course near me",
+    "first aid training for construction workers",
+    "cpr training",
+    "first aid classes near me",
+    "red cross first aid",
+    "workplace first aid training"
+  ],
+  "expanded_count": 400
+}
